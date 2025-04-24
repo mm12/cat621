@@ -3,12 +3,12 @@ changelog:
     labels:
       - ignore-for-release
   categories:
-    - title: "## Changed"
+    - title: "Changed"
       labels: 
         - "Type: Feature"
-    - title: "## Fixed"
+    - title: "Fixed"
       labels:
         - "Type: Bug"
-    - title: "## Other Changes"
+    - title: "Other Changes"
       labels:
         - "*"
