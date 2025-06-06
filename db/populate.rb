@@ -102,7 +102,7 @@ def generate_username
   @username
 end
 
-def populate_tags_from_file(filename, batch_size: 1000, error_log: "tag_errors.log")
+def populate_tags_from_file(filename, batch_size: 1000, error_log: "log/tag_errors.log")
   puts "* Populating tags from #{filename} in batches of #{batch_size}"
   tags = []
   File.open(error_log, "a") do |log|
@@ -151,7 +151,7 @@ end
 
 # ...existing code...
 
-def populate_bur_from_file(filename, model:, batch_size: 1000, error_log: "BUR_errors.log")
+def populate_bur_from_file(filename, model:, batch_size: 1000, error_log: "log/BUR_errors.log")
   puts "* Populating #{model.name.pluralize.downcase} from #{filename} in batches of #{batch_size}"
   rows = []
   File.open(error_log, "a") do |log|
