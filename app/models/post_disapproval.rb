@@ -36,9 +36,12 @@ class PostDisapproval < ApplicationRecord
         q = q.with_message if params[:has_message].to_s.truthy?
         q = q.without_message if params[:has_message].to_s.falsy?
 
+        dir = params[:direction].blank? || params[:direction].to_s.truthy? 
         case params[:order]
         when "post_id", "post_id_desc"
-          q = q.order(post_id: :desc, id: :desc)
+          q = q.order(post_id: dir ? :desc : :asc, id: dir ? :desc : :asc)
+        when "id_desc"
+          q = q.order(id: dir ? :desc : :asc)
         else
           q = q.apply_basic_order(params)
         end

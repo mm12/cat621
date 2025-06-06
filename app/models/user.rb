@@ -903,15 +903,16 @@ class User < ApplicationRecord
         q = q.where("last_ip_addr <<= ?", params[:ip_addr])
       end
 
+      dir = params[:direction].blank? || params[:direction].to_s.truthy? 
       case params[:order]
       when "name"
-        q = q.order("name")
+        q = q.order("name #{dir ? 'ASC' : 'DESC'}")
       when "post_upload_count"
-        q = q.order("user_statuses.post_count desc")
+        q = q.order("user_statuses.post_count #{dir ? 'ASC' : 'DESC'}")
       when "note_count"
-        q = q.order("user_statuses.note_count desc")
+        q = q.order("user_statuses.note_count #{dir ? 'ASC' : 'DESC'}")
       when "post_update_count"
-        q = q.order("user_statuses.post_update_count desc")
+        q = q.order("user_statuses.post_update_count #{dir ? 'ASC' : 'DESC'}")
       else
         q = q.apply_basic_order(params)
       end

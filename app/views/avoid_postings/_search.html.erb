@@ -16,4 +16,5 @@
   <% end %>
   <%= f.input :is_active, label: "Active?", collection: [["Yes", true], ["No", false]], include_blank: true %>
   <%= f.input :order, collection: [["Artist Name", "artist_name"], %w[Created created_at], %w[Updated updated_at]], include_blank: true %>
+  <%= f.input :direction, as: :boolean, label: "Reverse?"%>
 <% end %>

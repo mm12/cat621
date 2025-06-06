@@ -36,9 +36,10 @@ class Ban < ApplicationRecord
     q = q.expired if params[:expired].to_s.truthy?
     q = q.unexpired if params[:expired].to_s.falsy?
 
+    dir = params[:direction].blank? || params[:direction].to_s.truthy? 
     case params[:order]
     when "expires_at_desc"
-      q = q.order("bans.expires_at desc")
+      q = q.order("bans.expires_at #{dir ? 'ASC' : 'DESC'}")
     else
       q = q.apply_basic_order(params)
     end

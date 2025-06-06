@@ -99,13 +99,14 @@ class Comment < ApplicationRecord
       q = q.attribute_matches(:is_sticky, params[:is_sticky])
       q = q.attribute_matches(:do_not_bump_post, params[:do_not_bump_post])
 
+      dir = params[:direction].blank? || params[:direction].to_s.truthy? 
       case params[:order]
       when "post_id", "post_id_desc"
-        q = q.order("comments.post_id DESC, comments.created_at DESC")
+        q = q.order("comments.post_id #{dir ? 'ASC' : 'DESC'}, comments.created_at #{dir ? 'ASC' : 'DESC'}")
       when "score", "score_desc"
-        q = q.order("comments.score DESC, comments.created_at DESC")
+        q = q.order("comments.score #{dir ? 'ASC' : 'DESC'}, comments.created_at #{dir ? 'ASC' : 'DESC'}")
       when "updated_at", "updated_at_desc"
-        q = q.order("comments.updated_at DESC")
+        q = q.order("comments.updated_at #{dir ? 'ASC' : 'DESC'}")
       else
         # Force a better query plan
         if %i[body_matches creator_name creator_id].any? { |key| params[key].present? }

@@ -97,15 +97,17 @@ class AvoidPosting < ApplicationRecord
       q = q.attribute_matches(:staff_notes, params[:staff_notes])
       q = q.where_user(:creator_id, :creator, params)
       q = q.where("creator_ip_addr <<= ?", params[:ip_addr]) if params[:ip_addr].present?
+
+      dir = params[:direction].blank? || params[:direction].to_s.truthy? 
       case params[:order]
       when "artist_name", "artist_name_asc"
-        q = q.joins(:artist).order("artists.name ASC")
+        q = q.joins(:artist).order("artists.name #{dir ? 'ASC' : 'DESC'}")
       when "artist_name_desc"
-        q = q.joins(:artist).order("artists.name DESC")
+        q = q.joins(:artist).order("artists.name #{dir ? 'ASC' : 'DESC'}")
       when "created_at"
-        q = q.order("created_at DESC")
+        q = q.order("created_at #{dir ? 'ASC' : 'DESC'}")
       when "updated_at"
-        q = q.order("updated_at DESC")
+        q = q.order("updated_at #{dir ? 'ASC' : 'DESC'}")
       else
         q = q.apply_basic_order(params)
       end

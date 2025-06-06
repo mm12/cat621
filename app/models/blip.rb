@@ -105,9 +105,10 @@ class Blip < ApplicationRecord
         q = q.where("creator_ip_addr <<= ?", params[:ip_addr])
       end
 
+      dir = params[:direction].blank? || params[:direction].to_s.truthy? 
       case params[:order]
       when "updated_at", "updated_at_desc"
-        q = q.order("blips.updated_at DESC")
+        q = q.order("blips.updated_at #{dir ? 'ASC' : 'DESC'}")
       else
         q = q.apply_basic_order(params)
       end

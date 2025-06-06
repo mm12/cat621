@@ -158,7 +158,7 @@ class PostSetsController < ApplicationController
   end
 
   def search_params
-    permitted_params = %i[name shortname creator_id creator_name order]
+    permitted_params = %i[name shortname creator_id creator_name order direction]
     permitted_params += %i[is_public] if CurrentUser.is_moderator?
     permit_search_params permitted_params
   end

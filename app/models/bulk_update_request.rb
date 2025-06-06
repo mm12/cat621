@@ -60,12 +60,13 @@ class BulkUpdateRequest < ApplicationRecord
       q = q.attribute_matches(:title, params[:title_matches])
       q = q.attribute_matches(:script, params[:script_matches])
 
+      dir = params[:direction].blank? || params[:direction].to_s.truthy? 
       params[:order] ||= "status_desc"
       case params[:order]
       when "updated_at_desc"
-        q = q.order(updated_at: :desc)
+        q = q.order(updated_at: dir ? :asc : :desc)
       when "updated_at_asc"
-        q = q.order(updated_at: :asc)
+        q = q.order(updated_at: dir ? :asc : :desc)
       else
         q = q.apply_basic_order(params)
       end

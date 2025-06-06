@@ -370,13 +370,14 @@ class Tag < ApplicationRecord
 
       q = q.attribute_matches(:is_locked, params[:is_locked])
 
+      dir = params[:direction].blank? || params[:direction].to_s.truthy? 
       case params[:order]
       when "name"
-        q = q.order("name")
+        q = q.order("name #{dir ? "DESC" : "ASC"}")
       when "date"
-        q = q.order("id desc")
+        q = q.order("id #{dir ? "DESC" : "ASC"}")
       when "count"
-        q = q.order("post_count desc")
+        q = q.order("post_count #{dir ? "ASC" : "DESC"}")
       when "similarity"
         q = q.order_similarity(params[:fuzzy_name_matches]) if params[:fuzzy_name_matches].present?
       else

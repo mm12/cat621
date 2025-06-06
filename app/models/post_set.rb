@@ -317,19 +317,20 @@ class PostSet < ApplicationRecord
         q = q.attribute_matches(:is_public, params[:is_public])
       end
 
+      dir = params[:direction].blank? || params[:direction].to_s.truthy? 
       case params[:order]
       when 'name'
-        q = q.order(:name, id: :desc)
+        q = q.order(:name, id: dir ? :asc : :desc)
       when 'shortname'
-        q = q.order(:shortname, id: :desc)
+        q = q.order(:shortname, id: dir ? :asc : :desc)
       when 'postcount', 'post_count'
-        q = q.order(post_count: :desc, id: :desc)
+        q = q.order(post_count: dir ? :asc : :desc, id: dir ? :asc : :desc)
       when 'created_at'
         q = q.order(:id)
       when 'update', 'updated_at'
-        q = q.order(updated_at: :desc)
+        q = q.order(updated_at: dir ? :asc : :desc)
       else
-        q = q.order(id: :desc)
+        q = q.order(id: dir ? :asc : :desc)
       end
 
       q

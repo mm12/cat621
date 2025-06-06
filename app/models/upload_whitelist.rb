@@ -41,13 +41,14 @@ class UploadWhitelist < ApplicationRecord
         q = q.where("note ILIKE ?", params[:note].to_escaped_for_sql_like)
       end
 
+      dir = params[:direction].blank? || params[:direction].to_s.truthy? 
       case params[:order]
       when "pattern"
-        q = q.order("upload_whitelists.pattern")
+        q = q.order("upload_whitelists.pattern #{dir ? 'ASC' : 'DESC'}")
       when "updated_at"
-        q = q.order("upload_whitelists.updated_at desc")
+        q = q.order("upload_whitelists.updated_at #{dir ? 'DESC' : 'ASC'}")
       when "created_at"
-        q = q.order("id desc")
+        q = q.order("id #{dir ? 'DESC' : 'ASC'}")
       else
         q = q.apply_basic_order(params)
       end

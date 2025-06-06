@@ -156,15 +156,16 @@ class TagRelationship < ApplicationRecord
       q = q.where_user(:creator_id, :creator, params)
       q = q.where_user(:approver_id, :approver, params)
 
+      dir = params[:direction].blank? || params[:direction].to_s.truthy? 
       case params[:order]
       when "created_at"
-        q = q.order("#{table_name}.created_at desc nulls last, #{table_name}.id desc")
+        q = q.order("#{table_name}.created_at #{dir ? 'ASC' : 'DESC'} nulls last, #{table_name}.id #{dir ? 'ASC' : 'DESC'}")
       when "updated_at"
-        q = q.order("#{table_name}.updated_at desc nulls last, #{table_name}.id desc")
+        q = q.order("#{table_name}.updated_at #{dir ? 'ASC' : 'DESC'} nulls last, #{table_name}.id #{dir ? 'ASC' : 'DESC'}")
       when "name"
-        q = q.order("antecedent_name asc, consequent_name asc")
+        q = q.order("antecedent_name #{dir ? 'ASC' : 'DESC'}, consequent_name #{dir ? 'ASC' : 'DESC'}")
       when "tag_count"
-        q = q.join_consequent.order("consequent_tag.post_count desc, antecedent_name asc, consequent_name asc")
+        q = q.join_consequent.order("consequent_tag.post_count #{dir ? 'ASC' : 'DESC'}, antecedent_name #{dir ? 'ASC' : 'DESC'}, consequent_name #{dir ? 'ASC' : 'DESC'}")
       else
         q = q.apply_basic_order(params)
       end

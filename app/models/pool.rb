@@ -78,13 +78,14 @@ class Pool < ApplicationRecord
 
       q = q.attribute_matches(:is_active, params[:is_active])
 
+      dir = params[:direction].blank? || params[:direction].to_s.truthy?  
       case params[:order]
       when "name"
-        q = q.order("pools.name")
+        q = q.order("pools.name #{dir ? 'ASC' : 'DESC'}")
       when "created_at"
-        q = q.order("pools.created_at desc")
+        q = q.order("pools.created_at #{dir ? 'ASC' : 'DESC'}")
       when "post_count"
-        q = q.order(Arel.sql("cardinality(post_ids) desc")).default_order
+        q = q.order(Arel.sql("cardinality(post_ids) #{dir ? 'ASC' : 'DESC'}")).default_order
       else
         q = q.apply_basic_order(params)
       end

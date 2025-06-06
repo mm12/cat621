@@ -111,11 +111,12 @@ class WikiPage < ApplicationRecord
       q = q.attribute_matches(:is_locked, params[:is_locked])
       q = q.attribute_matches(:is_deleted, params[:is_deleted])
 
+      dir = params[:direction].blank? || params[:direction].to_s.truthy? 
       case params[:order]
       when "title"
-        q = q.order("title")
+        q = q.order("title #{dir ? "DESC" : "ASC"}")
       when "post_count"
-        q = q.includes(:tag).order("tags.post_count desc nulls last").references(:tags)
+        q = q.includes(:tag).order("tags.post_count #{dir ? "DESC" : "ASC"} nulls last").references(:tags)
       else
         q = q.apply_basic_order(params)
       end

@@ -39,11 +39,12 @@ class EmailBlacklist < ApplicationRecord
       q = q.where("reason ILIKE ?", params[:reason].to_escaped_for_sql_like)
     end
 
+    dir = params[:direction].blank? || params[:direction].to_s.truthy? 
     case params[:order]
     when "reason"
-      q = q.order("email_blacklists.reason")
+      q = q.order("email_blacklists.reason #{dir ? 'ASC' : 'DESC'}")
     when "domain"
-      q = q.order("email_blacklists.domain")
+      q = q.order("email_blacklists.domain #{dir ? 'ASC' : 'DESC'}")
     else
       q = q.apply_basic_order(params)
     end

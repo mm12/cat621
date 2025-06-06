@@ -243,11 +243,12 @@ class Takedown < ApplicationRecord
         q = q.where(creator: nil)
       end
 
+      dir = params[:direction].blank? || params[:direction].to_s.truthy? 
       case params[:order]
       when 'status'
-        q = q.order('status ASC')
+        q = q.order("status #{dir ? 'ASC' : 'DESC'}")
       when 'post_count'
-        q = q.order('post_count DESC')
+        q = q.order("post_count #{dir ? 'DESC' : 'ASC'}")
       else
         q = q.apply_basic_order(params)
       end

@@ -10,6 +10,7 @@
       <%= f.input :reason, collection: %w[borderline_quality borderline_relevancy other].map { |x| [x.humanize, x] }, include_blank: true %>
       <%= f.input :has_message, label: "Has Message?", collection: %w[Yes No], include_blank: true %>
       <%= f.input :order, collection: [["ID", "id_desc"], ["Post ID", "post_id_desc"]] %>
+      <%= f.input :direction, as: :boolean, label: "Reverse?"%>
     <% end %>
 
     <table class="striped autofit">

@@ -12,6 +12,7 @@
         <%= f.input :user_ip_addr, label: "IP Address" %>
         <%= f.input :duplicates_only, label: "Duplicates Only", as: :boolean %>
         <%= f.input :order, collection: [["Created", "id"], ["IP Address", "ip_addr"]] %>
+        <%= f.input :direction, as: :boolean, label: "Reverse?"%>
       <% end %>
     <% end %>
 

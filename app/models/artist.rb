@@ -487,13 +487,14 @@ class Artist < ApplicationRecord
         q = q.where("linked_user_id IS NULL")
       end
 
+      dir = params[:direction].blank? || params[:direction].to_s.truthy? 
       case params[:order]
       when "name"
-        q = q.order("artists.name")
+        q = q.order("artists.name #{dir ? "ASC" : "DESC"}")
       when "updated_at"
-        q = q.order("artists.updated_at desc")
+        q = q.order("artists.updated_at #{dir ? "ASC" : "DESC"}")
       when "post_count"
-        q = q.includes(:tag).order("tags.post_count desc nulls last").order("artists.name").references(:tags)
+        q = q.includes(:tag).order("tags.post_count #{dir ? "ASC" : "DESC"} nulls last").order("artists.name").references(:tags)
       else
         q = q.apply_basic_order(params)
       end

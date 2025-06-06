@@ -6,4 +6,5 @@
     <%= f.input :ip_addr, label: "Ip Address" %>
   <% end %>
   <%= f.input :order, include_blank: false, collection: [%w(Created id_desc), %w(Updated updated_at_desc)] %>
+  <%= f.input :direction, as: :boolean, label: "Reverse?"%>
 <% end %>

@@ -3,4 +3,5 @@
   <%= f.input :note, label: "Note", as: :string %>
   <%= f.input :reason, label: "Ban Reason" %>
   <%= f.input :order, collection: [["Note", "note"], ["Recently created", "created_at"], ["Last updated", "updated_at"], ["Pattern", "pattern"]] %>
+  <%= f.input :direction, as: :boolean, label: "Reverse?"%>
 <% end %>
