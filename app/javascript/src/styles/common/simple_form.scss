@@ -6,8 +6,14 @@
     margin-right: 0.25em;
   }
 
+  // input[type="submit"] {
+  //   display: block;
+  //   margin-top: 1em;
+  // }
+
   div.input {
     margin-bottom: 1em;
+    vertical-align: middle;
 
     input[type=text], input[type=file], input[type=password], input[type=email] {
       max-width: 80%;
@@ -62,6 +68,10 @@
       background-color: themed("color-button-active");
     }
   }
+
+  // > div.input:last-child {
+  //   margin-bottom: 0;
+  // }
 }
 
 .inline-form {
@@ -97,3 +107,17 @@ div.ui-dialog {
     }
   }
 }
+
+// /* Ensure inline-inputs are always inline and vertically centered */
+// .inline-inputs {
+//   display: inline-flex !important;
+//   align-items: center !important;
+//   gap: 0.5em;
+// }
+
+// /* Make labels inside inline-inputs inline and vertically centered */
+// .inline-inputs label {
+//   padding-right: $base-padding;
+//   display: table-cell;
+//   margin-bottom: 0 !important;
+// }
