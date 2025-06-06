@@ -564,13 +564,14 @@ class Post < ApplicationRecord
     end
 
     def set_tag_counts(disable_cache: true)
-      self.tag_count = 0
-      TagCategory::CATEGORIES.each { |x| set_tag_count(x, 0) }
-      categories = Tag.categories_for(tag_array, disable_cache: disable_cache)
-      categories.each_value do |category|
-        self.tag_count += 1
-        inc_tag_count(TagCategory::REVERSE_MAPPING[category])
-      end
+      self.tag_count = tag_count
+      ### DISABLE for import tags 
+      # TagCategory::CATEGORIES.each { |x| set_tag_count(x, 0) }
+      # categories = Tag.categories_for(tag_array, disable_cache: disable_cache)
+      # categories.each_value do |category|
+      #   self.tag_count += 1
+      #   inc_tag_count(TagCategory::REVERSE_MAPPING[category])
+      # end
     end
 
     def merge_old_changes
