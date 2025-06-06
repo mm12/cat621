@@ -4,6 +4,5 @@
   <%= f.user :creator %>
   <%= f.input :has_tag, label: "Has tag?", collection: [["Yes", true], ["No", false]], include_blank: true %>
   <%= f.input :is_linked, label: "Linked?", collection: [["Yes", true], ["No", false]], include_blank: true %>
-  <!--  f.input :order_desc, as: :boolean, label: falseinline_with: :order, input_html: { title: "Descending order" }     --> 
   <%= f.input :order, collection: [["Recently created", "created_at"], ["Last updated", "updated_at"], ["Name", "name"], ["Post count", "post_count"]] %>
 <% end %>

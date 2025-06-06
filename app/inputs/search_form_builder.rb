@@ -2,30 +2,12 @@
 
 class SearchFormBuilder < SimpleForm::FormBuilder
   def input(attribute_name, options = {}, &)
-    # # Handle inline_with option for boolean toggles
-    # inline_with = options.delete(:inline_with)
-    # if inline_with
-    #   @inline_booleans ||= {}
-    #   @inline_booleans[inline_with] ||= []
-    #   @inline_booleans[inline_with] << [attribute_name, options.dup]
-    #   return "" # Don't render now; will be rendered with the referenced input
-    # end
+    if attribute_name.to_sym == :order
+      order_input = super(attribute_name, options)
+      direction_input = super(:direction, { as: :boolean, label: "Reverse?", input_html: { value: "desc" } })
+      return order_input + direction_input
+    end
 
-    # # If this input has an inline boolean(s) attached, render them together
-    # if @inline_booleans && @inline_booleans[attribute_name]
-    #   main_input = super(attribute_name, options, &block)
-    #   inline_booleans = @inline_booleans[attribute_name].map do |(bool_attr, bool_opts)|
-    #     super(bool_attr, bool_opts.merge(label: false))
-    #   end.join.html_safe
-    #   return @template.content_tag(:span, main_input + inline_booleans, class: "inline-inputs")
-    # end
-  if attribute_name.to_sym == :order
-    order_input = super(attribute_name, options)
-    direction_input = super(:direction, { as: :boolean, label: "Reverse?", input_html: { value: "desc" } })
-    return order_input + direction_input
-  end
-
-    # # Default behavior
     value = value_for_attribute(attribute_name, options)
     return "".html_safe if value.nil? && options[:hide_unless_value]
     options = insert_autocomplete(options)
