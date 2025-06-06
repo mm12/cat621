@@ -2,12 +2,6 @@
 
 class SearchFormBuilder < SimpleForm::FormBuilder
   def input(attribute_name, options = {}, &)
-    if attribute_name.to_sym == :order
-      order_input = super(attribute_name, options)
-      direction_input = super(:direction, { as: :boolean, label: "Reverse?", input_html: { value: "desc" } })
-      return order_input + direction_input
-    end
-
     value = value_for_attribute(attribute_name, options)
     return "".html_safe if value.nil? && options[:hide_unless_value]
     options = insert_autocomplete(options)
