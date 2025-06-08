@@ -565,7 +565,7 @@ class Post < ApplicationRecord
 
     def set_tag_counts(disable_cache: true)
       self.tag_count = tag_count
-      ### DISABLE for import tags 
+      ### DISABLE for import tags
       # TagCategory::CATEGORIES.each { |x| set_tag_count(x, 0) }
       # categories = Tag.categories_for(tag_array, disable_cache: disable_cache)
       # categories.each_value do |category|
