@@ -67,4 +67,6 @@ Rails.application.configure do
   config.action_controller.raise_on_missing_callback_actions = true
 
   config.hosts << 'e621ng.local'
+  config.hosts << 'cat621.localhost'
+  config.hosts << 'cat621ng'
 end
