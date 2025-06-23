@@ -64,8 +64,20 @@ class UserVote < ApplicationRecord
           q = q.where("user_ip_addr <<= ?", params[:user_ip_addr])
         end
 
-        if params[:score].present?
+        if params[:score_type].present?
           q = q.where("#{table_name}.score = ?", params[:score])
+        end
+
+        if params[:score].present?
+          q = score_search_helper(q, params[:score], "score")
+        end
+
+        if params[:downvotes].present?
+          q = score_search_helper(q, params[:downvotes], "down_score")
+        end
+
+        if params[:upvotes].present?
+          q = score_search_helper(q, params[:upvotes], "up_score")
         end
 
         if params[:duplicates_only].to_s.truthy?
@@ -78,6 +90,43 @@ class UserVote < ApplicationRecord
         q = q.order(:user_ip_addr)
       else
         q = q.apply_basic_order(params)
+      end
+      q
+    end
+    def score_search_helper(q, score_string, range_type)
+      # handle numbers ('a'), ranges ('a..b'), and comparisons ('>a','<a',''>=a','<=a')
+      # score_string is a string
+      # we have the table `post_votes`, which contains a `post_id`. 
+      # We need to look at `posts` table for the `score`, `upvotes`, and `downvotes`.
+      return q unless score_string.present? && range_type.present?
+      q = q.joins(:post) unless q.joins_values.include?(:post)
+      
+      if score_string =~ /\A-?\d+\z/
+        # single number
+        q = q.where("post.#{range_type} = ?", score_string.to_i)
+      elsif score_string =~ /\A-?\d+\.\.-?\d+\z/
+        # range 'a..b'
+        a, b = score_string.split("..").map(&:to_i)
+        q = q.where("posts.#{range_type} >= ? AND posts.#{range_type} <= ?", a, b)
+      elsif score_string =~ /\A[<>=]?-?\d+\z/
+        # comparison '>a', '<a', '>=a', '<=a'
+        operator = score_string[0] # first character is the operator
+        value = score_string[1..-1].to_i
+        case operator
+        when '>'
+          q = q.where("posts.#{range_type} > ?", value)
+        when '<'
+          q = q.where("posts.#{range_type} < ?", value)
+        when '='
+          q = q.where("posts.#{range_type} = ?", value)
+        when '>='
+          q = q.where("posts.#{range_type} >= ?", value)
+        when '<='
+          q = q.where("posts.#{range_type} <= ?", value)
+        end
+      else
+        # invalid format, return original query
+        raise Error, "Invalid format for #{range_type}: #{score_string}"
       end
       q
     end

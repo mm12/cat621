@@ -3,8 +3,8 @@
 class PostVotesController < ApplicationController
   respond_to :json
   respond_to :html, only: [:index]
-  before_action :member_only
-  before_action :moderator_only, only: %i[index lock]
+  before_action :member_only, only: [:index]
+  before_action :moderator_only, only: %i[lock]
   before_action :admin_only, only: [:delete]
   before_action :ensure_lockdown_disabled
   skip_before_action :api_check
@@ -57,7 +57,8 @@ class PostVotesController < ApplicationController
   private
 
   def search_params
-    permitted_params = %i[post_id user_name user_id post_creator_id post_creator_name timeframe score]
+    permitted_params = %i[post_id  post_creator_id post_creator_name timeframe score score_type] 
+    permitted_params += %i[user_name user_id upvotes downvotes] if CurrentUser.is_staff?
     permitted_params += %i[user_ip_addr duplicates_only order] if CurrentUser.is_admin?
     permit_search_params permitted_params
   end
