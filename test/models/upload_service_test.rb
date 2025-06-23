@@ -152,6 +152,23 @@ class UploadServiceTest < ActiveSupport::TestCase
             sample.unlink
           end
         end
+
+        context "for a webp" do
+          setup do
+            @file = file_fixture("test.webp").open
+          end
+
+          should "generate a preview" do
+            preview, crop, sample = subject.generate_resizes(@file, @upload)
+            assert_operator(File.size(preview.path), :>, 0)
+            assert_operator(File.size(crop.path), :>, 0)
+            assert_operator(File.size(sample.path), :>, 0)
+            preview.close
+            preview.unlink
+            sample.close
+            sample.unlink
+          end
+        end
       end
     end
 
