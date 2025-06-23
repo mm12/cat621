@@ -17,7 +17,7 @@ Rails.application.configure do
     policy.frame_ancestors :none
     policy.frame_src   'https://www.google.com/recaptcha/', 'https://www.recaptcha.net/'
     policy.font_src    :self
-    policy.img_src     :self, :data, 'static1.e621.net', 'static1.e926.net', 'ads.dragonfru.it', 'cat621ng', 'cat621.localhost', 'e621.localhost', 'http://localhost:3000'
+    policy.img_src     :self, :data, 'static1.e621.net', 'static1.e926.net', 'ads.dragonfru.it', 'cat621ng', 'cat621.localhost', 'e621.localhost', 'http://localhost:3000', "https://reverser.yiff.today"
     policy.child_src   :none
     policy.form_action :self, 'discord.e621.net', 'discord.com'
     # Specify URI for violation reports

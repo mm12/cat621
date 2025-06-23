@@ -72,7 +72,7 @@ class TagQuery
     id filetype type rating description parent user user_id approver flagger deletedby delreason
     source status pool set fav favoritedby note locked upvote votedup downvote voteddown voted
     width height mpixels ratio filesize duration score favcount date age change tagcount
-    commenter comm noter noteupdater
+    commenter comm noter noteupdater flagreason flagnote
   ].concat(CATEGORY_METATAG_MAP.keys).freeze
 
   METATAGS = %w[md5 order limit child randseed ratinglocked notelocked statuslocked].concat(
@@ -1421,6 +1421,15 @@ class TagQuery
       when "description", "-description", "~description" then add_to_query(type, :description, g2)
 
       when "note", "-note", "~note" then add_to_query(type, :note, g2)
+
+      when "flagreason", "-flagreason", "~flagreason"
+        add_to_query(type, :flagreason, g2, wildcard: true)
+
+      when "flagnote", "-flagnote", "~flagnote"
+        add_to_query(type, :flagnote, g2, wildcard: true)
+
+      when "flagger", "-flagger", "~flagger"
+        add_to_query(type, :flagger, user_id_or_invalid(g2))
 
       when "delreason", "-delreason", "~delreason"
         q[:status] ||= "any" unless q[:status_must_not]

@@ -226,7 +226,7 @@ class Post < ApplicationRecord
     end
 
     def has_dimensions?
-      image_width.present? && image_height.present?
+      image_width.present? && image_height.present? && image_width > 0 && image_height > 0
     end
 
     def preview_dimensions(max_px = Danbooru.config.small_image_width)
