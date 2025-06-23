@@ -779,14 +779,6 @@ class Post < ApplicationRecord
         tags -= ["animated_webp"]
       end
 
-      unless is_avif?
-        tags -= ["animated_avif"]
-      end
-
-      unless is_jxl?
-        tags -= ["animated_jxl"]
-      end
-
       return tags
     end
 
