@@ -23,12 +23,11 @@ class StorageManager
   end
 
   def default_base_path
-    ""
+    "/data"
   end
 
   def default_base_url
-    "https://reverser.yiff.today/data/"
-    # Rails.application.routes.url_helpers.root_url
+    Rails.application.routes.url_helpers.root_url
   end
 
   # Store the given file at the given path. If a file already exists at that
@@ -119,15 +118,15 @@ class StorageManager
 
     return "/images/download-preview.png" if type == :preview && !post.has_preview?
     path = if type == :preview
-             "#{base}/thumbs/#{subdir}#{file}"
+             "#{base}/preview/#{subdir}#{file}"
            elsif type == :crop
-             "#{base}/imgs/#{subdir}#{file}"
+             "#{base}/crop/#{subdir}#{file}"
            elsif type == :scaled
-             "#{base}/imgs/#{subdir}#{file}"
+             "#{base}/sample/#{subdir}#{file}"
            elsif type == :large && post.has_large?
-             "#{base}/imgs/#{subdir}#{file}"
+             "#{base}/sample/#{subdir}#{file}"
            else
-             "#{base}/imgs/#{subdir}#{file}"
+             "#{base}/#{subdir}#{file}"
            end
     if post.protect_file?
       "#{base_url}#{path}#{protected_params(path, post)}"
@@ -215,7 +214,6 @@ class StorageManager
   end
 
   def subdir_for(md5)
-    ""
-    #hierarchical ? "#{md5[0..1]}/#{md5[2..3]}/" : ""
+    hierarchical ? "#{md5[0..1]}/#{md5[2..3]}/" : ""
   end
 end
