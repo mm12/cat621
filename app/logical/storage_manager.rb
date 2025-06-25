@@ -23,12 +23,11 @@ class StorageManager
   end
 
   def default_base_path
-    ""
+    "/data"
   end
 
   def default_base_url
-    "https://reverser.yiff.today/data/"
-    # Rails.application.routes.url_helpers.root_url
+    Rails.application.routes.url_helpers.root_url
   end
 
   # Store the given file at the given path. If a file already exists at that
