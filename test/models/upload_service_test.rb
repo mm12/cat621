@@ -199,7 +199,6 @@ class UploadServiceTest < ActiveSupport::TestCase
         end
       end
     end
-
   end
 
   context "#start!" do
