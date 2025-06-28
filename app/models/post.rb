@@ -601,7 +601,8 @@ class Post < ApplicationRecord
     end
 
     def set_tag_counts(disable_cache: true)
-      self.tag_count = 0
+      # self.tag_count = tag_count
+      ### DISABLE for import tags
       TagCategory::CATEGORIES.each { |x| set_tag_count(x, 0) }
       categories = Tag.categories_for(tag_array, disable_cache: disable_cache)
       categories.each_value do |category|
@@ -810,6 +811,18 @@ class Post < ApplicationRecord
 
       unless is_png?
         tags -= ["animated_png"]
+      end
+
+      unless is_webp?
+        tags -= ["animated_webp"]
+      end
+
+      unless is_avif?
+        tags -= ["animated_avif"]
+      end
+
+      unless is_jxl?
+        tags -= ["animated_jxl"]
       end
 
       return tags

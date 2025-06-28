@@ -50,6 +50,7 @@ module PostIndex
           uploader: { type: "integer" },
           approver: { type: "integer" },
           deleter: { type: "integer" },
+          flagger: { type: "integer" },
           width: { type: "integer" },
           height: { type: "integer" },
           mpixels: { type: "float" },
@@ -64,6 +65,8 @@ module PostIndex
           description: { type: "text" },
           notes: { type: "text" },
           del_reason: { type: "keyword" },
+          flag_detail: { type: "keyword" },
+          flag_type: { type: "keyword" },
 
           rating_locked: { type: "boolean" },
           note_locked: { type: "boolean" },
@@ -150,6 +153,14 @@ module PostIndex
              GROUP BY post_id) pfi
           INNER JOIN post_flags pf ON pf.id = pfi.mid;
         SQL
+        flaggings_sql = <<-SQL
+          SELECT pf.post_id, pf.creator_id, LOWER(pf.reason) as reason FROM
+            (SELECT MAX(id) as mid, post_id
+             FROM post_flags
+             WHERE post_id IN (#{post_ids}) AND is_resolved = false AND is_deletion = false
+             GROUP BY post_id) pfi
+          INNER JOIN post_flags pf ON pf.id = pfi.mid;
+        SQL
         pending_replacements_sql = <<-SQL
           SELECT DISTINCT p.id, CASE WHEN pr.post_id IS NULL THEN false ELSE true END FROM posts p
             LEFT OUTER JOIN post_replacements2 pr ON p.id = pr.post_id AND pr.status = 'pending'
@@ -164,6 +175,10 @@ module PostIndex
         deletions        = conn.execute(deletion_sql)
         deleter_ids      = deletions.values.map {|p,did,dr| [p,did]}.to_h
         del_reasons      = deletions.values.map {|p,did,dr| [p,dr]}.to_h
+        flaggings        = conn.execute(flaggings_sql)
+        flagger_ids      = flaggings.values.map {|p,fid,fr| [p,fid]}.to_h
+        flag_types       = flaggings.values.map {|p,fid,fr| [p,fr]}.to_h
+        flag_details     = flaggings.values.map {|p,fid,fr| [p,fr]}.to_h
         comment_counts   = conn.execute(comments_sql).values.to_h
         pool_ids         = conn.execute(pools_sql).values.map(&array_parse).to_h
         set_ids          = conn.execute(sets_sql).values.map(&array_parse).to_h
@@ -201,6 +216,9 @@ module PostIndex
             notes:                    notes[p.id]          || empty,
             deleter:                  deleter_ids[p.id]    || empty,
             del_reason:               del_reasons[p.id]    || empty,
+            flagger:                  flagger_ids[p.id]    || empty,
+            flag_type:                flag_types[p.id]   || empty,
+            flag_detail:              flag_details[p.id]   || empty,
             has_pending_replacements: pending_replacements[p.id],
             artverified:              p.tag_array.any? { |tag| verified_artists.key?(tag) && verified_artists[tag] == p.uploader_id },
           }
@@ -262,6 +280,9 @@ module PostIndex
       approver:      approver_id,
       deleter:       options[:deleter]    || ::PostFlag.where(post_id: id, is_resolved: false, is_deletion: true).order(id: :desc).first&.creator_id,
       del_reason:    options[:del_reason] || ::PostFlag.where(post_id: id, is_resolved: false, is_deletion: true).order(id: :desc).first&.reason&.downcase,
+      flagger:       options[:flagger]    || ::PostFlag.where(post_id: id, is_resolved: false, is_deletion: false).order(id: :desc).first&.creator_id,
+      flag_type:     options[:flag_type]  || ::PostFlag.where(post_id: id, is_resolved: false, is_deletion: false).order(id: :desc).first&.reason&.downcase,
+      flag_detail:   options[:flag_detail] || ::PostFlag.where(post_id: id, is_resolved: false, is_deletion: false).order(id: :desc).first&.note&.downcase,
       width:         image_width,
       height:        image_height,
       mpixels:       image_width && image_height ? (image_width.to_f * image_height / 1_000_000).round(2) : 0.0,

@@ -29,7 +29,7 @@ if presets.values.sum == 0
     postvotes: 100,
     commentvotes: 100,
     pools: 100,
-    furids: 0,
+    furids: 10,
     dmails: 0,
   }
 end
@@ -101,6 +101,111 @@ def generate_username
 
   @username
 end
+
+def populate_tags_from_file(filename, batch_size: 1000, error_log: "log/tag_errors.log")
+  puts "* Populating tags from #{filename} in batches of #{batch_size}"
+  tags = []
+  File.open(error_log, "a") do |log|
+    File.foreach(filename).with_index do |line, idx|
+      # Format: {id},name,category,count
+      _, name, category, count = line.strip.split(",", 4)
+      next unless name && category && count
+      tags << { name: name, category: category, post_count: count.to_i }
+
+      if tags.size >= batch_size
+        Tag.transaction do
+          tags.each do |tag_data|
+            tag = Tag.find_or_initialize_by(name: tag_data[:name])
+            tag.category = tag_data[:category]
+            tag.post_count = tag_data[:post_count]
+            unless tag.save
+              error_message = "error: #{tag.errors.full_messages.join('; ')} for tag #{tag_data[:name]}"
+              puts "    #{error_message}"
+              log.puts("#{error_message} | data: #{tag_data.inspect}")
+            end
+          end
+        end
+        puts "  - Processed #{idx + 1} lines"
+        tags.clear
+      end
+    end
+
+    # Process any remaining tags
+    unless tags.empty?
+      Tag.transaction do
+        tags.each do |tag_data|
+          tag = Tag.find_or_initialize_by(name: tag_data[:name])
+          tag.category = tag_data[:category]
+          tag.post_count = tag_data[:post_count]
+          unless tag.save
+            error_message = "error: #{tag.errors.full_messages.join('; ')} for tag #{tag_data[:name]}"
+            puts "    #{error_message}"
+            log.puts("#{error_message} | data: #{tag_data.inspect}")
+          end
+        end
+      end
+      puts "  - Processed final batch"
+    end
+  end
+end
+
+# ...existing code...
+
+def populate_bur_from_file(filename, model:, batch_size: 1000, error_log: "log/BUR_errors.log")
+  puts "* Populating #{model.name.pluralize.downcase} from #{filename} in batches of #{batch_size}"
+  rows = []
+  File.open(error_log, "a") do |log|
+    File.foreach(filename).with_index do |line, idx|
+      # Format: id,antecedent_name,consequent_name,created_at,status
+      _, antecedent_name, consequent_name, _, status = line.strip.split(",", 5)
+      next unless antecedent_name && consequent_name && status
+
+      rows << { antecedent_name: antecedent_name, consequent_name: consequent_name, status: status }
+
+      if rows.size >= batch_size
+        model.transaction do
+          rows.each do |row|
+            obj = model.find_or_initialize_by(
+              antecedent_name: row[:antecedent_name],
+              consequent_name: row[:consequent_name]
+            )
+            obj.status = row[:status]
+            unless obj.save
+              error_message = "error: #{obj.errors.full_messages.join('; ')} for #{row.inspect}"
+              puts "    #{error_message}"
+              log.puts("#{error_message} | data: #{row.inspect}")
+            end
+          end
+        end
+        puts "  - Processed #{idx + 1} lines"
+        rows.clear
+      end
+    end
+
+    # Process any remaining rows
+    unless rows.empty?
+      model.transaction do
+        rows.each do |row|
+          obj = model.find_or_initialize_by(
+            antecedent_name: row[:antecedent_name],
+            consequent_name: row[:consequent_name]
+          )
+          obj.status = row[:status]
+          unless obj.save
+            error_message = "error: #{obj.errors.full_messages.join('; ')} for #{row.inspect}"
+            puts "    #{error_message}"
+            log.puts("#{error_message} | data: #{row.inspect}")
+          end
+        end
+      end
+      puts "  - Processed final batch"
+    end
+  end
+end
+
+# Usage examples:
+# populate_bur_from_file("db/seed/aliases.csv", model: TagAlias)
+# populate_bur_from_file("db/seed/implications.csv", model: TagImplication)
 
 def populate_posts(number, search: "order:random+score:>150+-grandfathered_content", users: [], batch_size: 320)
   return [] unless number > 0
@@ -404,10 +509,13 @@ CurrentUser.user = User.find(1)
 CurrentUser.ip_addr = "127.0.0.1"
 
 users = populate_users(USERS)
-posts = populate_posts(POSTS, users: users)
-fill_avatars(users, posts)
+populate_tags_from_file("db/seed/tags.csv") if File.exist?("db/seed/tags.csv")
+populate_bur_from_file("db/seed/aliases.csv", model: TagAlias)
+populate_bur_from_file("db/seed/implications.csv", model: TagImplication)
 
-populate_posts(FURIDS, search: "furid_(e621)") if FURIDS
+posts = populate_posts(POSTS, users: users)
+furIDs = populate_posts(FURIDS, search: "furid_(e621)") if FURIDS
+fill_avatars(users, furIDs || posts)
 
 comments = populate_comments(COMMENTS, users: users)
 populate_favorites(FAVORITES, users: users)
