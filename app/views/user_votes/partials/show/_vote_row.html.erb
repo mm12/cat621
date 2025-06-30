@@ -1,0 +1,25 @@
+<tr id="r<%= vote.id %>">
+  <td><%= vote.id %></td>
+  <% post_id = vote.send("#{type.model_type}_id") %>
+  <td><%= link_to post_id, vote.send(type.model_type) %></td>
+  <td> 
+    <span class="score-positive"> ↑ <%= vote.post.up_score %> </span> 
+    <span class="score-negative"> ↓ <%= vote.post.down_score %> </span> 
+  </td>
+  <td><%= link_to_user vote.send(type.model_type).send(type.model_creator_column) %></td>
+  <td><%= if CurrentUser.is_staff? then link_to_user vote.user end %></td>
+  <% if CurrentUser.is_admin? %>
+    <td><%= vote.user.email %></td>
+  <% end %>
+  <td><%= if CurrentUser.is_staff? then time_ago_in_words_tagged(vote.user.created_at) end %></td>
+  <td>
+    <% if vote.is_positive? %><span class="text-green text-bold">Up</span>
+    <% elsif vote.is_locked? %><span class="text-yellow text-bold">Locked</span>
+    <% else %><span class="text-red text-bold">Down</span>
+    <% end %>
+  </td>
+  <td><%= time_ago_in_words_tagged(vote.created_at) %></td>
+  <% if CurrentUser.is_admin? %>
+    <td><%= link_to_ip vote.user_ip_addr %></td>
+  <% end %>
+</tr>

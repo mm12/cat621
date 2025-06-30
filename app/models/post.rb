@@ -229,6 +229,26 @@ class Post < ApplicationRecord
       end
     end
 
+    def has_preview?
+      is_image? || is_video?
+    end
+
+    def has_dimensions?
+      image_width.present? && image_height.present? && image_width > 0 && image_height > 0
+    end
+
+    def preview_dimensions(max_px = Danbooru.config.small_image_width)
+      return [max_px, max_px] unless has_dimensions?
+      height = width = max_px
+      dimension_ratio = image_width.to_f / image_height
+      if dimension_ratio > 1
+        height = (width / dimension_ratio).to_i
+      else
+        width = (height * dimension_ratio).to_i
+      end
+      [height, width]
+    end
+
     def has_sample_size?(scale)
       return false if video_sample_list.blank?
       return false if video_sample_list[:samples].blank?
@@ -601,7 +621,8 @@ class Post < ApplicationRecord
     end
 
     def set_tag_counts(disable_cache: true)
-      self.tag_count = 0
+      # self.tag_count = tag_count
+      ### DISABLE for import tags
       TagCategory::CATEGORIES.each { |x| set_tag_count(x, 0) }
       categories = Tag.categories_for(tag_array, disable_cache: disable_cache)
       categories.each_value do |category|
@@ -810,6 +831,18 @@ class Post < ApplicationRecord
 
       unless is_png?
         tags -= ["animated_png"]
+      end
+
+      unless is_webp?
+        tags -= ["animated_webp"]
+      end
+
+      unless is_avif?
+        tags -= ["animated_avif"]
+      end
+
+      unless is_jxl?
+        tags -= ["animated_jxl"]
       end
 
       return tags

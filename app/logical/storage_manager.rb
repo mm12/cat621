@@ -227,7 +227,6 @@ class StorageManager
   def subdir_for(md5)
     hierarchical ? "#{md5[0..1]}/#{md5[2..3]}/" : ""
   end
-
   def protected_params(url, secret: Danbooru.config.protected_file_secret)
     user_id = CurrentUser.id
     time = (Time.now + 15.minutes).to_i
