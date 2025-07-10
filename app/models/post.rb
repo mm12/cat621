@@ -2044,4 +2044,13 @@ class Post < ApplicationRecord
       comments.visible(user).count
     end
   end
+
+  def post_upload_attributes
+    attributes = {}
+    attributes["sources"] = source_array.join(", ") if source_array.any?
+    attributes["rating"] = rating if rating.present?
+    attributes["description"] = description if description.present?
+    attributes["tags"] = tag_string if tag_string.present?
+    attributes
+  end
 end
