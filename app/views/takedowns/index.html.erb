@@ -19,7 +19,7 @@
       </tr>
       </thead>
       <tbody>
-      <% @takedowns.each do |takedown| %>
+      <% @takedowns.each do |takedown| %> <!--TODO-->
         <%= tag.tr(id: "takedown-#{takedown.id}") do %>
           <td><%= link_to takedown.id, takedown_path(takedown) %></td>
           <td>

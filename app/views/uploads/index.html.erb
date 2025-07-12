@@ -13,7 +13,7 @@
         </tr>
       </thead>
       <tbody>
-        <% @uploads.each do |upload| %>
+        <% @uploads.each do |upload| %> <!--TODO-->
           <tr>
             <td>
               <%= PostPresenter.preview(upload.post, tags: "user:#{upload.uploader_name}", show_deleted: true) %>

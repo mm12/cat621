@@ -16,7 +16,7 @@
         </tr>
       </thead>
       <tbody>
-        <% @post_approvals.each do |post_approval| %>
+        <% @post_approvals.each do |post_approval| %> <!--TODO-->
           <tr>
             <td>
               <%= PostPresenter.preview(post_approval.post, show_deleted: true) %>

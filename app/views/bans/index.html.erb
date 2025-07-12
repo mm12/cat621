@@ -17,7 +17,7 @@
         </tr>
       </thead>
       <tbody>
-        <% @bans.each do |ban| %>
+        <% @bans.each do |ban| %> <!--TODO-->
           <tr id="ban-<%= ban.id %>" data-expired="<%= ban.expired? %>">
             <td>
               <%= link_to_user(ban.user) %>

@@ -21,7 +21,7 @@
       </thead>
 
       <tbody>
-        <% @tickets.each do |ticket| %>
+        <% @tickets.each do |ticket| %> <!--TODO-->
           <tr data-link="<%= ticket_path(ticket) %>">
             <td><%= link_to ticket.id, ticket_path(ticket) %></td>
             <% if CurrentUser.is_moderator? %>

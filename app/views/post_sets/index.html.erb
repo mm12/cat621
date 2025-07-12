@@ -19,7 +19,7 @@
         </thead>
 
         <tbody>
-        <% @post_sets.each do |s| %>
+        <% @post_sets.each do |s| %> <!--TODO-->
           <tr>
             <td><%= link_to s.name, post_set_path(s) %></td>
             <td><%= link_to s.shortname, posts_path(tags: "set:#{s.shortname}") %></td>
