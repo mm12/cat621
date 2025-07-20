@@ -1,6 +1,6 @@
 <% if @ticket.content %>
     <tr>
-      <td><span class='title'>Reported Post</span></td>
+      <th><span class='title'>Reported Post</span></th>
       <td>
           <%= PostPresenter.preview(@ticket.content, show_deleted: true, no_blacklist: true).presence || link_to("Post ##{@ticket.disp_id}", post_path(id: @ticket.disp_id)) %>
       </td>

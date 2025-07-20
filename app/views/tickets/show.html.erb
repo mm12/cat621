@@ -3,10 +3,10 @@
     <div class='section'>
       <h3><%= @ticket.type_title %> Ticket</h3>
 
-      <table>
+      <table class="simple-kv">
         <% if @ticket.can_see_reporter?(CurrentUser) %>
           <tr>
-            <td><span class='title'>Requested by</span></td>
+            <th><span class='title'>Requested by</span></th>
             <td>
               <%= link_to_user @ticket.creator %>
               (<%= link_to "Pending Tickets", tickets_path(search: { creator_id: @ticket.creator.id, status: "pending" }) %>)
@@ -16,14 +16,14 @@
 
         <% if CurrentUser.is_admin? %>
           <tr>
-            <td><span class='title'>IP</span></td>
+            <th><span class='title'>IP</span></th>
             <td><%= link_to_ip(@ticket.creator_ip_addr) %></td>
           </tr>
         <% end %>
 
         <% if @ticket.accused.present? && CurrentUser.is_moderator? %>
           <tr>
-            <td><span class="title">Accused</span></td>
+            <th><span class="title">Accused</span></th>
             <td>
               <%= link_to_user @ticket.accused %>
               <% if (pending_accused_count = Ticket.active.for_accused(@ticket.accused.id).count) >= 2 %>
@@ -34,17 +34,17 @@
         <% end %>
 
         <tr>
-          <td><span class="title">Created</span></td>
+          <th><span class="title">Created</span></th>
           <td style="cursor:help;"><%= time_ago_in_words_tagged(@ticket.created_at) %></td>
         </tr>
         <tr>
-          <td><span class="title">Updated</span></td>
+          <th><span class="title">Updated</span></td>
           <td style="cursor:help;"><%= time_ago_in_words_tagged(@ticket.updated_at) %></td>
         </tr>
 
         <% if @ticket.response.present? %>
           <tr>
-            <td><span class='title'>Handled by</span></td>
+            <th><span class='title'>Handled by</span></th>
             <% if @ticket.handler.present? %>
               <td><%= link_to_user @ticket.handler %></td>
             <% else %>
@@ -54,7 +54,7 @@
           <% else %>
             <% if CurrentUser.is_moderator? %>
               <tr>
-                <td><span class="title">Claimed by</span></td>
+                <th><span class="title">Claimed by</span></th>
                 <% if @ticket.claimant.nil? %>
                   <td id="claimed_by"><%= link_to 'Claim', claim_ticket_path(@ticket), method: :post %></td>
                 <% else %>
@@ -70,7 +70,7 @@
         <% end %>
 
         <tr>
-          <td><span class='title'>Status</span></td>
+          <th><span class='title'>Status</span></th>
           <td class="<%= @ticket.status %>-ticket"><%= pretty_ticket_status(@ticket) %></td>
         </tr>
 
@@ -78,7 +78,7 @@
           <% open_duplicates = @ticket.open_duplicates.to_a %>
           <% if open_duplicates.any? %>
             <tr>
-              <td><span class="title">Open Duplicates</span></td>
+              <th><span class="title">Open Duplicates</span></th>
               <td>
                 <ul>
                   <% open_duplicates.each do |dup| %>
@@ -93,7 +93,7 @@
         <%= render partial: "tickets/types/#{@ticket.qtype}" %>
 
         <tr>
-          <td><span class='title'>Reason</span></td>
+          <th><span class='title'>Reason</span></th>
           <td class="dtext-container">
             <% if @ticket.qtype == "post" && @ticket.post_report_reason.present? %>
               <p><%= @ticket.post_report_reason.reason %></p>
@@ -104,7 +104,7 @@
 
         <% if @ticket.response.present? %>
           <tr>
-            <td><span class='title'>Response</span></td>
+            <th><span class='title'>Response</span></th>
             <td class="dtext-container"><%= format_text(!@ticket.response.blank? ? @ticket.response : "No response.") %></td>
           </tr>
         <% end %>

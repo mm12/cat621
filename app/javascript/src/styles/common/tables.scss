@@ -92,3 +92,25 @@ table.aligned-vertical {
     height: 1.75em;
   }
 }
+
+table.simple-kv {
+  border-spacing: 0.5em 0.3rem; 
+  border-collapse: separate; 
+
+  
+  tr tbody, tr {
+    td {
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      @extend td;
+      white-space: nowrap;
+      font-weight: 100;
+    }
+    td label, td.title {
+      @extend th;
+      font-weight: bold;
+    }
+  }
+}

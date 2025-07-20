@@ -1,6 +1,6 @@
 <% if @ticket.content %>
     <tr>
-      <td><span class='title'>Reported Pool</span></td>
+      <th><span class='title'>Reported Pool</span></th>
       <td><%= link_to(@ticket.content.name, pool_path(@ticket.content)) %></td>
     </tr>
 <% end %>

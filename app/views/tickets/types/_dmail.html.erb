@@ -1,6 +1,6 @@
 <% @dmail = @ticket.content %>
 <tr>
-  <td><span class='title'>Reported Message</span></td>
+  <th><span class='title'>Reported Message</span></th>
   <td>
     <%= link_to "Message", dmail_path(@dmail) %>
     sent from <%= link_to_user @dmail.from %> to
