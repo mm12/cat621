@@ -1,9 +1,7 @@
 const PostFlags = {};
 
 PostFlags.init = function () {
-  if (PostFlags._initialized) {
-    return;
-  }
+  if (PostFlags._initialized) return;
   PostFlags._initialized = true;
 
   for (const container of $(".post-flag-note")) {
@@ -17,55 +15,36 @@ PostFlags.init = function () {
   // Section: require flag note
   const flagReasonLabels = document.querySelectorAll(".flag-reason-label");
   const noteField = document.getElementById("flag_note_field");
-  const radioButtons = document.getElementsByName("post_flag[reason_name]");
-  let form = null;
-  if (noteField) {
-    form = noteField.closest("form");
-  } else {
-    const dialogBody = document.querySelector(".flag-dialog-body");
-    if (dialogBody) {
-      form = dialogBody.querySelector("form");
-    }
-  }
+
+  // single-form resolution
+  const form = noteField?.closest("form") || document.querySelector(".flag-dialog-body form");
 
   if (noteField) {
     const notesContainer = noteField.closest(".flag-notes");
     const label = notesContainer?.querySelector("label[for=\"flag_note_field\"]") || notesContainer?.querySelector("label");
-    let indicator = notesContainer?.querySelector(".required-indicator");
+    const indicator = notesContainer?.querySelector(".required-indicator");
 
-    if (label && !label.querySelector(".required-indicator")) {
-      if (indicator && !label.contains(indicator)) {
-        label.appendChild(indicator);
-      }
+    if (label && indicator && !label.contains(indicator)) {
+      label.appendChild(indicator);
     }
   }
 
-  function updateNoteRequired () {
+  function updateNoteRequired() {
     if (!noteField) return;
     const selected = document.querySelector("input[name=\"post_flag[reason_name]\"]:checked");
     const notesContainer = noteField.closest(".flag-notes");
     const label = notesContainer?.querySelector("label");
     const indicator = label?.querySelector(".required-indicator") || notesContainer?.querySelector(".required-indicator");
 
-    if (selected && (selected.dataset.requireExplanation || "").trim().toLowerCase() === "true") {
-      noteField.required = true;
-      if (indicator) {
-        indicator.hidden = false;
-      }
-    } else {
-      noteField.required = false;
-      if (indicator) {
-        indicator.hidden = true;
-      }
-    }
+    const requires = (selected?.dataset?.requireExplanation || "").trim().toLowerCase() === "true";
+    noteField.required = !!requires;
+    if (indicator) indicator.hidden = !requires;
   }
 
   if (form) {
-    form.addEventListener("submit", function (e) {
+    form.addEventListener("submit", (e) => {
       updateNoteRequired();
-      if (e.submitter) {
-        e.submitter.disabled = true;
-      }
+      if (e.submitter) e.submitter.disabled = true;
     });
   }
 
@@ -77,9 +56,6 @@ PostFlags.init = function () {
       const parentLabel = e.target.closest(".flag-reason-label");
       if (parentLabel) parentLabel.classList.add("selected");
       updateNoteRequired();
-    });
-    Array.from(radioButtons).forEach(radio => {
-      radio.addEventListener("change", updateNoteRequired);
     });
   }
 
