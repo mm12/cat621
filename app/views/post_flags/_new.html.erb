@@ -44,6 +44,7 @@
 
     <div class="flag-notes">
       <%= f.input :note, as: :dtext, label: "Additional Details", limit: Danbooru.config.comment_max_size, input_html: { id: "flag_note_field" } %>
+      <span class="required-indicator" hidden> (required)</span>
     </div>
     
     <div>

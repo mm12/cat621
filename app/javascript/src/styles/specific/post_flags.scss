@@ -2,17 +2,35 @@ div#c-post-flags {
   tr.flag-resolved-true {
     background: $negative-record-background !important;
   }
+
+  .flag-notes {
+    .required-indicator {
+      margin-left: .25rem;
+      font-weight: 400;
+      color: #d00;
+    }
+    
+    label.dtext.optional[for="flag_note_field"],
+    .flag-note-label,
+    .required-indicator,
+    .flag-note-label + .required-indicator {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .required-indicator[hidden] { display: none; }
+  }
 }
 
 .post-flag-note {
   background: themed("color-section-lighten-5");
   margin: 0.5rem 0;
+
   @include st-radius;
 
   &-header {
     display: none; // flex
     gap: 0.25rem;
-
     padding: 0.5rem;
     font-size: 1rem;
     font-weight: bold;
@@ -31,14 +49,17 @@ div#c-post-flags {
 
   &.expandable {
     .post-flag-note-header { display: flex; }
+
     .post-flag-note-body {
       padding-top: 0;
       display: none;
     }
+
     &.expanded {
       .post-flag-note-header svg {
         transform: rotate(90deg);
       }
+
       .post-flag-note-body {
         display: block;
       }
