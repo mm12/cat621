@@ -55,6 +55,17 @@ module FileMethods
     end
   end
 
+  def is_animated_webp?(file_path)
+    return false unless is_webp?
+
+    image = Vips::Image.new_from_file(file_path, n: -1)
+    begin
+      image.get("n-pages") > 1
+    rescue Vips::Error
+      false
+    end
+  end
+
   def is_ai_generated?(file_path)
     return false if !is_image?
 
