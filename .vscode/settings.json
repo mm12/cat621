@@ -18,6 +18,6 @@
   // Eslint shenanigans
   "eslint.useFlatConfig": true,
   "eslint.validate": [
-    "javascript"
+    "javascript", "css", "scss", "typescript"
   ],
 }
