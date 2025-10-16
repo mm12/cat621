@@ -4,6 +4,7 @@ require "zxcvbn"
 
 class User < ApplicationRecord
   class Error < Exception ; end
+
   class PrivilegeError < Exception
     attr_accessor :message
 
@@ -678,7 +679,7 @@ class User < ApplicationRecord
         :id, :created_at, :name, :level, :base_upload_limit,
         :post_upload_count, :post_update_count, :note_update_count,
         :is_banned, :can_approve_posts, :can_upload_free,
-        :level_string, :avatar_id, :is_verified?,
+        :level_string, :avatar_id, :is_verified?, :flair_color,
       ]
 
       if id == CurrentUser.user.id
@@ -870,6 +871,10 @@ class User < ApplicationRecord
         q = q.where(avatar_id: params[:avatar_id])
       end
 
+      if params[:flair_color].present?
+        q = q.where(flair_color: params[:flair_color])
+      end
+
       if params[:email_matches].present?
         q = q.where_ilike(:email, params[:email_matches])
       end
@@ -1014,5 +1019,42 @@ class User < ApplicationRecord
     @upload_limit_pieces = nil
     @feedback_pieces = nil
     self
+  end
+
+  def user_color
+    # If a flair_color (stored as an integer) is set, return it as a hex string (#rrggbb).
+    return flair_color_hex if flair_color.present?
+
+    # Fallback: return a hex color code based on the user's ID.
+    "##{Digest::MD5.hexdigest(id.to_s)[-6..]}"
+  end
+
+  # Returns the flair color as a hex string like "#rrggbb", or nil if not set.
+  def flair_color_hex
+    return nil if flair_color.nil?
+    "##{format('%06x', flair_color)}"
+  end
+
+  # Accepts a hex string like "#rrggbb" or "rrggbb", or an integer. Stores as integer.
+  def flair_color_hex=(val)
+    if val.blank?
+      self.flair_color = nil
+    elsif val.is_a?(Integer)
+      self.flair_color = val & 0xFFFFFF
+    else
+      hex = val.to_s.strip
+      hex = hex[1..-1] if hex.start_with?("#")
+      # If the string contains non-hex characters, to_i(16) will stop at first non-hex, which is acceptable here.
+      self.flair_color = hex.to_i(16) & 0xFFFFFF
+    end
+  end
+
+  # Returns an [r, g, b] array (0-255) for the stored flair_color, or nil if not set.
+  def flair_color_rgb
+    return nil if flair_color.nil?
+    r = (flair_color >> 16) & 0xFF
+    g = (flair_color >> 8) & 0xFF
+    b = flair_color & 0xFF
+    [r, g, b]
   end
 end
