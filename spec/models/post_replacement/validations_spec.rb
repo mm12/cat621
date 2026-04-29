@@ -9,6 +9,10 @@ require "rails_helper"
 RSpec.describe PostReplacement do
   include_context "as admin"
 
+  def uploaded_file(path, mime_type)
+    Rack::Test::UploadedFile.new(Rails.root.join("spec/fixtures/files", path), mime_type)
+  end
+
   # All PostReplacement validators fire `on: :create`.  Calling `valid?` on a
   # new (unsaved) record sets the context to :create, triggering them all.
   # Most validators involve real file I/O; the helper below stubs them out so
@@ -18,6 +22,10 @@ RSpec.describe PostReplacement do
       allow(record).to receive(m)
     end
     allow(FileValidator).to receive(:new).and_return(instance_double(FileValidator, "validator", validate: nil))
+  end
+
+  def stub_storage_write(record)
+    allow(record).to receive(:write_storage_file)
   end
 
   # --------------------------------------------------------------------------
@@ -143,6 +151,41 @@ RSpec.describe PostReplacement do
       expect(record.errors[:creator]).to be_present
     end
 
+    it "is invalid when the creator has reached the per-day replacement limit" do
+      creator = create(:user)
+      post = create(:post)
+      allow(Danbooru.config.custom_configuration).to receive(:post_replacement_per_day_limit).and_return(0)
+
+      record = build(:post_replacement, post: post, creator: creator)
+      stub_file_validators(record)
+
+      expect(record).not_to be_valid
+      expect(record.errors[:creator]).to include("has already suggested too many replacements for this post today")
+    end
+
+    it "is invalid when the creator has reached the per-post replacement limit" do
+      creator = create(:user)
+      post = create(:post)
+      allow(Danbooru.config.custom_configuration).to receive(:post_replacement_per_post_limit).and_return(0)
+
+      record = build(:post_replacement, post: post, creator: creator)
+      stub_file_validators(record)
+
+      expect(record).not_to be_valid
+      expect(record.errors[:creator]).to include("already has too many pending replacements for this post")
+    end
+
+    it "is invalid when the creator has no remaining upload limit" do
+      creator = create(:user)
+      allow(creator).to receive(:can_upload_with_reason).and_return(:REJ_UPLOAD_LIMIT)
+
+      record = build(:post_replacement, creator: creator)
+      stub_file_validators(record)
+
+      expect(record).not_to be_valid
+      expect(record.errors[:creator]).to include("have reached your upload limit")
+    end
+
     it "skips the check when status is 'original'" do
       creator = create(:user)
       allow(creator).to receive(:can_upload_with_reason).and_return(:restricted)
@@ -150,6 +193,70 @@ RSpec.describe PostReplacement do
       stub_file_validators(record)
       record.valid?
       expect(record.errors[:creator]).to be_empty
+    end
+  end
+
+  describe "file validation" do
+    it "adds an error for an empty file" do
+      record = build(
+        :post_replacement,
+        creator: create(:user),
+        post: create(:post),
+        replacement_file: uploaded_file("apng_inspector/empty.png", "image/png"),
+        is_backup: false,
+      )
+      stub_storage_write(record)
+
+      expect(record).not_to be_valid
+      expect(record.errors.full_messages.join).to match(/File ext \S* is invalid/)
+    end
+
+    it "adds an error for a corrupt file" do
+      record = build(
+        :post_replacement,
+        creator: create(:user),
+        post: create(:post),
+        replacement_file: uploaded_file("file_validator/corrupt.jpg", "image/jpeg"),
+        image_width: 256,
+        image_height: 256,
+        is_backup: false,
+      )
+      allow(record).to receive(:update_file_attributes)
+      allow(record).to receive_messages(image_width: 256, image_height: 256)
+      stub_storage_write(record)
+
+      expect(record).not_to be_valid
+      expect(record.errors.full_messages).to eq(["File is corrupt"])
+    end
+
+    it "adds an error when the file is too large" do
+      allow(Danbooru.config.custom_configuration).to receive(:max_file_sizes).and_return({ "png" => 0 })
+      record = build(
+        :post_replacement,
+        creator: create(:user),
+        post: create(:post),
+        replacement_file: uploaded_file("sample.png", "image/png"),
+        is_backup: false,
+      )
+      stub_storage_write(record)
+
+      expect(record).not_to be_valid
+      expect(record.errors.full_messages.join).to match(/File size is too large/)
+    end
+
+    it "adds an error when an apng is too large" do
+      allow(Danbooru.config.custom_configuration).to receive(:max_apng_file_size).and_return(0)
+      record = build(
+        :post_replacement,
+        creator: create(:user),
+        post: create(:post),
+        replacement_file: uploaded_file("apng_inspector/normal_apng.png", "image/png"),
+        is_backup: false,
+      )
+      stub_storage_write(record)
+
+      expect(record).not_to be_valid
+      expect(record.errors.full_messages.join).to match(/File size is too large/)
     end
   end
 end
