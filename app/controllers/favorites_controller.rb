@@ -1,54 +1,74 @@
 # frozen_string_literal: true
 
 class FavoritesController < ApplicationController
+  include JsonResponseHelper
+
   before_action :member_only, except: [:index]
   before_action :ensure_lockdown_disabled, except: %i[index]
-  respond_to :html, :json
+  respond_to :json
+  respond_to :html, only: [:index]
   skip_before_action :api_check
 
   def index
-    if params[:tags]
-      redirect_to(posts_path(tags: params[:tags]))
-    else
-      user_id = params[:user_id] || CurrentUser.user.id
-      @user = User.find(user_id)
-
-      if @user.hide_favorites?
-        @post_set = PostSets::Post.new("limit:0")
+    if params[:tags].present?
+      if params[:tags].is_a?(String)
+        redirect_to(posts_path(tags: params[:tags]))
       else
-        @post_set = PostSets::Favorites.new(@user, params[:page], limit: params[:limit])
+        render_expected_error(400, "Invalid tags parameter")
       end
+      return
+    end
 
-      @posts = PostsDecorator.decorate_collection(@post_set.posts)
-      respond_with(@posts) do |fmt|
-        fmt.json do
-          render json: @post_set.api_posts, root: "posts"
-        end
+    user_id = params[:user_id] || CurrentUser.user.id
+    @user = User.find(user_id)
+
+    if @user.hide_favorites?
+      @post_set = PostSets::Post.new("limit:0")
+    else
+      @post_set = PostSets::Favorites.new(@user, params[:page], limit: params[:limit])
+    end
+
+    @posts = @post_set.posts
+    respond_with(@posts) do |fmt|
+      fmt.json do
+        render_posts_json(PostBlueprint.render_as_hash(@post_set.api_posts), collection: true)
       end
     end
   end
 
   def create
     @post = Post.find(params[:post_id])
-    FavoriteManager.add!(user: CurrentUser.user, post: @post)
-    flash.now[:notice] = "You have favorited this post"
 
-    respond_with(@post)
-  rescue Favorite::Error, ActiveRecord::RecordInvalid => x
-    render_expected_error(422, x.message)
+    if @post.favorites_transfer_in_progress?
+      render_expected_error(423, "Post favorites are being transferred, please try again later")
+      return
+    end
+
+    FavoriteManager.add!(user: CurrentUser.user, post: @post)
+
+    render json: { post_id: @post.id, favorite_count: @post.fav_count }
+  rescue Favorite::Error, ActiveRecord::RecordInvalid => e
+    render_expected_error(422, e.message)
   end
 
   def destroy
     @post = Post.find(params[:id])
+
+    if @post.favorites_transfer_in_progress?
+      render_expected_error(423, "Post favorites are being transferred, please try again later")
+      return
+    end
+
     FavoriteManager.remove!(user: CurrentUser.user, post: @post)
 
-    flash.now[:notice] = "You have unfavorited this post"
-    respond_with(@post)
-  rescue Favorite::Error => x
-    render_expected_error(422, x.message)
+    render json: { post_id: @post.id, favorite_count: @post.fav_count }
+  rescue Favorite::Error => e
+    render_expected_error(422, e.message)
   end
 
+  private
+
   def ensure_lockdown_disabled
-    access_denied if Security::Lockdown.favorites_disabled? && !CurrentUser.is_staff?
+    render_expected_error(403, "Favorites are disabled") if Security::Lockdown.favorites_disabled? && !CurrentUser.is_staff?
   end
 end

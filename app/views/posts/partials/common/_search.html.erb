@@ -1,15 +1,15 @@
 <%# locals: (title: "Search", tags: "") %>
 
 <section class="post-search">
-  <h3 class="post-search-title"><%= title %></h3>
+  <label for="tags" class="post-search-title"><%= title %></label>
   <span class="post-search-help"><%= link_to "[search help]", help_page_path(id: "cheatsheet") %></span>
 
-  <%= form_tag(posts_path, method: "get", class: "post-search-form") do %>
+  <%= form_tag(posts_path, method: "get", rel: "search", class: "post-search-form") do %>
     <% if params[:random] %>
       <%= hidden_field_tag :random, params[:random] %>
     <% end %>
 
-    <%= text_area_tag("tags", tags, placeholder: "Search posts by tag", rows: 1, data: { shortcut: "q", autocomplete: "tag-query" }) %>
+    <%= text_area_tag("tags", tags, placeholder: "Search posts by tag", rows: 1, data: { hotkey: "search", autocomplete: "tag-query" }) %>
     <%= tag.button(svg_icon(:search), type: "submit", title: "Search") %>
   <% end %>
 </section>

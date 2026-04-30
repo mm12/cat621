@@ -1,31 +1,69 @@
-<% if CurrentUser.is_member? %>
-  <div class="image-vote-buttons">
-    <%= post_vote_block(@post, @post.own_vote, buttons: true) %>
-  </div>
-  <%= tag.div(class: "fav-buttons fav-buttons-#{@post.is_favorited?}") do %>
-    <%= button_tag id: "add-fav-button", class: "button btn-success", data: { pid: @post.id, shortcut: "f" } do %>
-      <%= tag.i(class: "fa-regular fa-star") %>
-      <span>Favorite</span>
-    <% end %>
-    <%= button_tag id: "remove-fav-button", class: "button btn-danger", data: { pid: @post.id, shortcut: "shift+f" } do %>
-      <%= tag.i(class: "fa-solid fa-star") %>
-      <span>Unfavorite</span>
-    <% end %>
-  <% end %>
-<% end %>
 
-<% if @post.visible? %>
-  <div id="image-download-link">
-    <%= link_to @post.file_url, class: "button btn-warn" do %>
-      <%= tag.i(class: "fa-solid fa-right-to-bracket fa-rotate-90") %>
-      <span>Download</span>
-    <% end %>
+<section id="ptbr-wrapper">
+<div class="ptbr-row">
+
+<% if CurrentUser.is_member? %>
+  <%# ===== VOTE ===== #%>
+  <div
+    class="ptbr-vote"
+    data-score="<%= @post.score %>"
+    data-up="<%= @post.up_score %>"
+    data-down="<%= @post.down_score %>"
+    data-state="<%= post_score_state(@post) %>"
+    data-vote="<%= @post.own_vote.nil? ? 0 : @post.own_vote.score %>"
+  >
+    <button
+      class="st-button kinetic ptbr-vote-button"
+      data-action="1"
+      processing="false"
+      title="Vote Up"
+    ><%= svg_icon(:chevron_up) %></button>
+    <button class="st-button kinetic ptbr-score" title="Post Score">
+      <%= @post.score %>
+    </button>
+    <span class="ptbr-breakdown hidden">
+      <span><%= @post.up_score %></span><span><%= @post.down_score %></span>
+    </span>
+    <button
+      class="st-button kinetic ptbr-vote-button"
+      data-action="-1"
+      processing="false"
+      title="Vote Down"
+    ><%= svg_icon(:chevron_down) %></button>
+  </div>
+
+  <%# ===== FAVORITE ===== #%>
+  <div class="ptbr-favorite">
+    <button
+      class="st-button kinetic ptbr-favorite-button anim"
+      favorited="<%= @post.is_favorited? %>"
+      processing="false"
+      title="Favorite"
+    >
+      <%= svg_icon(:star) %>
+    </button>
+  </div>
+<% else %>
+  <div
+    class="ptbr-vote"
+    data-score="<%= @post.score %>"
+    data-up="<%= @post.up_score %>"
+    data-down="<%= @post.down_score %>"
+    data-state="<%= post_score_state(@post) %>"
+  >
+    <button class="st-button kinetic ptbr-score anonymous" title="Score">
+      <%= @post.score %>
+    </button>
+    <span class="ptbr-breakdown hidden">
+      <span><%= @post.up_score %></span><span><%= @post.down_score %></span>
+    </span>
   </div>
 <% end %>
 
 <% if !@post.force_original_size? %>
-  <div>
-    <select id="image-resize-selector" class="button btn-neutral">
+  <%# ===== RESIZE ===== #%>
+  <div class="ptbr-resize">
+    <select id="image-resize-selector" class="st-button" aria-label="Select image size">
       <option value="original">Original</option>
       <option value="fit">Fit (Horizontal)</option>
       <option value="fitv">Fit (Vertical)</option>
@@ -39,3 +77,117 @@
   </select>
   </div>
 <% end %>
+</div>
+
+<div class="ptbr-row">
+<% if CurrentUser.is_member? %>
+  <%# ===== EDIT ===== #%>
+  <div class="ptbr-edit">
+    <button
+      type="button"
+      id="post-edit-link"
+      data-hotkey="edit"
+      class="st-button kinetic ptbr-edit-button"
+    >
+      Edit
+    </button>
+  </div>
+<% end %>
+
+<% if @post.visible? %>
+  <%# ===== FULLSCREEN ===== #%>
+  <div class="ptbr-fullscreen">
+    <a
+      href="<%= @post.file_url %>"
+      class="st-button kinetic ptbr-fullscreen-button"
+      data-hotkey="fullscreen"
+      title="View Full Size"
+    >
+      Fullscreen
+    </a>
+  </div>
+<% end %>
+
+<% if @post.visible? %>
+  <%# ===== NOTES ===== #%>
+  <div class="<%= @post.has_notes? ? "ptbr-notes" : "ptbr-notes hidden" %>">
+    <button
+      class="st-button kinetic ptbr-notes-button"
+      enabled="true"
+      data-hotkey="note-toggle"
+      title="Toggle Notes"
+      aria-label="Toggle Notes"
+      aria-pressed="false"
+    ></button>
+  </div>
+<% end %>
+
+
+<% if @post.visible? %>
+  <%# ===== OVERFLOW ===== #%>
+  <div class="ptbr-etc">
+    <button
+      class="st-button kinetic ptbr-etc-toggle"
+      title="More Options"
+      aria-label="More Options"
+      aria-expanded="false"
+      aria-controls="ptbr-etc-menu"
+    >
+      <%= svg_icon(:ellipsis_v) %>
+    </button>
+    <div class="ptbr-etc-menu hidden" id="ptbr-etc-menu" role="menu">
+      <a
+        href="<%= @post.file_url %>"
+        class="st-button ptbr-etc-download"
+        download="<%= @post.md5 %>.<%= @post.file_ext %>"
+        pending="false"
+        data-hotkey="download"
+      >
+        <%= svg_icon(:hexagon) %>
+        <span>Download</span>
+      </a>
+      <button class="st-button ptbr-share-button" data-hotkey="share">Share</button>
+      <% if CurrentUser.is_member? %>
+        <button class="st-button ptbr-etc-pool add-to-pool" data-hotkey="add-to-pool">Add to Pool</button>
+        <button class="st-button ptbr-etc-set add-to-set" data-hotkey="add-to-set">Add to Set</button>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+</div>
+</section>
+
+
+<% if @post.visible? %>
+<section id="ptbr-share-menu" class="hidden">
+
+  <h4>Share Post</h4>
+
+  <div class="ptbr-share-input">
+    <input type="text" class="ptbr-share-link" readonly value="<%= post_short_url(@post) %>" />
+    <button class="st-button ptbr-share-copy" data-value="<%= post_short_url(@post) %>">Copy</button>
+  </div>
+</section>
+<% end %>
+
+
+<%# SVG Filters %>
+<section id="ptbr-svg-filters">
+  <svg height="0" width="0">
+    <filter id="inset-shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feComponentTransfer in="SourceAlpha">
+        <feFuncA type="table" tableValues="1 0"></feFuncA>
+      </feComponentTransfer>
+      <feGaussianBlur stdDeviation="1"></feGaussianBlur>
+      <feOffset result="offsetblur" dx="1" dy="1"></feOffset>
+      <feFlood result="color" flood-color="#be9e2f"></feFlood>
+      <feComposite in2="offsetblur" operator="in"></feComposite>
+      <feComposite in2="SourceAlpha" operator="in"></feComposite>
+      <feMerge>
+        <feMergeNode in="SourceGraphic"></feMergeNode>
+        <feMergeNode></feMergeNode>
+      </feMerge>
+    </filter>
+  </svg>
+</section>

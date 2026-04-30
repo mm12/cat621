@@ -1,4 +1,6 @@
 .profile-avatar {
+  --thumb-image-size: 5rem;
+
   .avatar-image {
     display: flex;
     width: 5rem;
@@ -8,35 +10,36 @@
 
     background: themed("color-section");
     @include st-radius;
+  }
 
-    // Letter if no avatar image
-    &::after {
-      content: attr(data-initial);
+  article.thumbnail.blacklisted a.thm-link {
+    background: themed("color-section");
+  }
 
-      display: flex;
-      justify-content: center;
-      align-items: center;
+  // Letter if no avatar image
+  .avatar-image::after,
+  article.thumbnail.blacklisted a.thm-link:before {
+    content: attr(data-initial);
 
-      font-size: 5rem;
-      font-weight: bold;
-      color: themed("color-foreground");
+    display: flex;
+    justify-content: center;
+    align-items: center;
 
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: 0;
-      right: 0;
-    }
+    font-size: 5rem;
+    font-weight: bold;
+    color: themed("color-foreground");
 
-    // On top of the letter
-    img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      z-index: 1;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
 
-      @include st-radius;
-    }
+    // Reset default blacklist colors
+    background: unset;
+    line-height: unset;
+    transform: unset;
+    font-family: "Roboto", Verdana, Geneva, sans-serif;
   }
 }
 
@@ -67,8 +70,11 @@ nav.navigation .simple-avatar {
       color: themed("color-background");
       font-weight: bold;
       font-size: 2.25rem;
+      font-family: "Roboto", Verdana, Geneva, sans-serif;
     }
   }
+
+  &.blacklisted .avatar-image img { display: none; }
 
   .avatar-more {
     @include st-radius-right;
@@ -106,7 +112,7 @@ nav.navigation .simple-avatar {
   // Desktop
   @include window-larger-than(50rem) {
     .avatar-name {
-      background: none;
+      background: themed("color-background");
       color: inherit;
 
       height: 1.5rem;
@@ -127,7 +133,7 @@ nav.navigation .simple-avatar {
     }
 
     &:hover, &:active {
-      .avatar-name { background: none; }
+      .avatar-name { background: themed("color-background"); }
     }
 
     .avatar-more {
@@ -219,6 +225,31 @@ nav.navigation .simple-avatar-menu {
   @include window-larger-than(50rem) {
     right: 0;
   }
+}
+
+// Avatar menu conditional visibility
+nav.navigation .simple-avatar-menu {
+  --display-uploads: none;
+  --display-favorites: none;
+  --display-sets: none;
+  --display-comments: none;
+  --display-forums: none;
+  --display-content-divider: none;
+  --display-mentions-divider: none;
+
+  &.has-uploads { --display-uploads: unset; --display-content-divider: unset; }
+  &.has-favorites { --display-favorites: unset; --display-content-divider: unset; }
+  &.has-sets { --display-sets: unset; --display-content-divider: unset; }
+  &.has-comments { --display-comments: unset; --display-mentions-divider: unset; }
+  &.has-forums { --display-forums: unset; --display-mentions-divider: unset; }
+
+  .must-uploads { display: var(--display-uploads); }
+  .must-favorites { display: var(--display-favorites); }
+  .must-sets { display: var(--display-sets); }
+  .must-comments { display: var(--display-comments); }
+  .must-forums { display: var(--display-forums); }
+  .must-uploads-favorites-sets { display: var(--display-content-divider); }
+  .must-comments-forums { display: var(--display-mentions-divider); }
 }
 
 

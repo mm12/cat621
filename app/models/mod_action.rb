@@ -6,6 +6,7 @@ class ModAction < ApplicationRecord
   validates :creator_id, presence: true
 
   KnownActions = {
+    admin_user_delete: { user_id: :integer },
     artist_page_rename: { old_name: :string, new_name: :string },
     artist_page_lock: { artist_page: :string },
     artist_page_unlock: { artist_page: :string },
@@ -48,6 +49,10 @@ class ModAction < ApplicationRecord
     help_update: { name: :string, wiki_page: :string },
     ip_ban_create: { ip_addr: :string, reason: :string },
     ip_ban_delete: { ip_addr: :string, reason: :string },
+    search_trend_blacklist_create: { tag: :string, reason: :string },
+    search_trend_blacklist_update: { tag: :string, reason: :string },
+    search_trend_blacklist_delete: { tag: :string, reason: :string },
+    search_trend_blacklist_purge: { tag: :string, reason: :string, deleted_count: :integer },
     mascot_create: { id: :integer },
     mascot_update: { id: :integer },
     mascot_delete: { id: :integer },
@@ -66,9 +71,9 @@ class ModAction < ApplicationRecord
     ticket_claim: { ticket_id: :integer },
     ticket_unclaim: { ticket_id: :integer },
     ticket_update: { ticket_id: :integer, status: :string, response: :string, status_was: :string, response_was: :string },
-    upload_whitelist_create: { pattern: :string, note: :string, hidden: :boolean },
-    upload_whitelist_update: { pattern: :string, note: :string, old_pattern: :string, hidden: :boolean },
-    upload_whitelist_delete: { pattern: :string, note: :string, hidden: :boolean },
+    upload_whitelist_create: { domain: :string, path: :string, note: :string, hidden: :boolean },
+    upload_whitelist_update: { domain: :string, path: :string, note: :string, old_domain: :string, old_path: :string, hidden: :boolean },
+    upload_whitelist_delete: { domain: :string, path: :string, note: :string, hidden: :boolean },
     user_blacklist_changed: { user_id: :integer },
     user_text_change: { user_id: :integer },
     user_upload_limit_change: { user_id: :integer, old_upload_limit: :integer, new_upload_limit: :integer },
@@ -189,7 +194,8 @@ class ModAction < ApplicationRecord
   end
 
   def values
-    original_values = self[:values]
+    original_values = self[:values] || {}
+    return {} unless original_values.is_a?(Hash)
 
     if CurrentUser.is_admin?
       original_values

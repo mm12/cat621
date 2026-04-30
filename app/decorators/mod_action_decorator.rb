@@ -103,7 +103,7 @@ class ModActionDecorator < ApplicationDecorator
 
       ### User ###
 
-    when "user_delete"
+    when "user_delete", "admin_user_delete"
       "Deleted user #{user}"
     when "user_ban"
       if (vals["duration"].is_a?(Numeric) && vals["duration"] < 0) || vals["duration"] == "permanent"
@@ -135,7 +135,7 @@ class ModActionDecorator < ApplicationDecorator
         "Changed #{user} level to #{vals['level']}"
       end
     when "user_flags_change"
-      "Changed #{user} flags. Added: [#{vals['added'].join(', ')}] Removed: [#{vals['removed'].join(', ')}]"
+      "Changed #{user} flags. Added: [#{vals['added']&.join(', ')}] Removed: [#{vals['removed']&.join(', ')}]"
     when "edited_user"
       "Edited #{user}"
     when "user_blacklist_changed"
@@ -154,7 +154,7 @@ class ModActionDecorator < ApplicationDecorator
       ### User Record ###
 
     when "user_feedback_create"
-      "Created #{vals['type'].capitalize} record ##{vals['record_id']} for #{user} with reason: #{vals['reason']}"
+      "Created #{vals['type']&.capitalize} record ##{vals['record_id']} for #{user} with reason: #{vals['reason']}"
     when "user_feedback_update"
       if vals["reason_was"].present? || vals["type_was"].present?
         text = "Edited record ##{vals['record_id']} for #{user}"
@@ -240,20 +240,20 @@ class ModActionDecorator < ApplicationDecorator
 
     when "blip_update"
       "Edited blip ##{vals['blip_id']} by #{user}"
+    when "blip_destroy"
+      if vals["username"]
+        "Destroyed blip ##{vals['blip_id']} by #{user}"
+      else
+        "Destroyed blip ##{vals['blip_id']}"
+      end
     when "blip_delete"
-      if vals['username']
+      if vals["username"]
         "Deleted blip ##{vals['blip_id']} by #{user}"
       else
         "Deleted blip ##{vals['blip_id']}"
       end
-    when "blip_hide"
-      if vals['username']
-        "Hid blip ##{vals['blip_id']} by #{user}"
-      else
-        "Hid blip ##{vals['blip_id']}"
-      end
-    when "blip_unhide"
-      "Unhid blip ##{vals['blip_id']} by #{user}"
+    when "blip_undelete"
+      "Undeleted blip ##{vals['blip_id']} by #{user}"
 
       ### Tag ###
 
@@ -341,28 +341,42 @@ class ModActionDecorator < ApplicationDecorator
       ### Whitelist ###
 
     when "upload_whitelist_create"
-      if vals['hidden'] && !CurrentUser.is_admin?
+      if CurrentUser.is_admin?
+        if vals["pattern"]
+          "Created whitelist entry `#{vals['pattern']}`"
+        else
+          "Created whitelist entry `#{vals['domain']}` `#{vals['path']}`"
+        end
+      elsif vals["hidden"]
         "Created whitelist entry"
       else
-        "Created whitelist entry '#{CurrentUser.is_admin? ? vals['pattern'] : vals['note']}'"
+        "Created whitelist entry '#{vals['note']}'"
       end
 
     when "upload_whitelist_update"
-      if vals['hidden'] && !CurrentUser.is_admin?
+      if CurrentUser.is_admin?
+        if vals["pattern"]
+          "Edited whitelist entry `#{vals['old_pattern']}` → `#{vals['pattern']}`"
+        else
+          "Edited whitelist entry `#{vals['old_domain']}` `#{vals['old_path']}` → `#{vals['domain']}` `#{vals['path']}`"
+        end
+      elsif vals["hidden"]
         "Edited whitelist entry"
       else
-        if vals['old_pattern'] && vals['old_pattern'] != vals['pattern'] && CurrentUser.is_admin?
-          "Edited whitelist entry '#{vals['old_pattern']}' → '#{vals['pattern']}'"
-        else
-          "Edited whitelist entry '#{CurrentUser.is_admin? ? vals['pattern'] : vals['note']}'"
-        end
+        "Edited whitelist entry '#{vals['note']}'"
       end
 
     when "upload_whitelist_delete"
-      if vals['hidden'] && !CurrentUser.is_admin?
+      if CurrentUser.is_admin?
+        if vals["pattern"]
+          "Deleted whitelist entry `#{vals['pattern']}`"
+        else
+          "Deleted whitelist entry `#{vals['domain']}` `#{vals['path']}`"
+        end
+      elsif vals["hidden"]
         "Deleted whitelist entry"
       else
-        "Deleted whitelist entry '#{CurrentUser.is_admin? ? vals['pattern'] : vals['note']}'"
+        "Deleted whitelist entry '#{vals['note']}'"
       end
 
       ### Help ###

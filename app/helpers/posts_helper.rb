@@ -2,7 +2,7 @@
 
 module PostsHelper
   def discover_mode?
-    params[:tags] =~ /order:rank/
+    params[:tags].to_s =~ /order:hot/
   end
 
   def next_page_url
@@ -71,18 +71,18 @@ module PostsHelper
     html.html_safe
   end
 
-  def is_pool_selected?(pool)
-    return false if params.has_key?(:q)
-    return false if params.has_key?(:post_set_id)
-    return false unless params.has_key?(:pool_id)
-    return params[:pool_id].to_i == pool.id
+  def is_pool_selected?(pool, selected: nil)
+    return false if selected.blank?
+    return false if params.key?(:q)
+    return false if params.key?(:post_set_id)
+    selected == pool.id
   end
 
-  def is_post_set_selected?(post_set)
-    return false if params.has_key?(:q)
-    return false if params.has_key?(:pool_id)
-    return false unless params.has_key?(:post_set_id)
-    return params[:post_set_id].to_i == post_set.id
+  def is_post_set_selected?(post_set, selected: nil)
+    return false if selected.blank?
+    return false if params.key?(:q)
+    return false if params.key?(:pool_id)
+    selected == post_set.id
   end
 
   def post_stats_section(post)
@@ -101,17 +101,6 @@ module PostsHelper
     tag.div score + favs + comments + rating, class: "desc"
   end
 
-  def user_record_meta(user)
-    feedback = user.feedback_pieces
-    return "" if feedback[:active] == 0
-
-    link_to(user_feedbacks_path(search: { user_id: user.id }), class: "user-feedback-list") do
-      concat tag.span(feedback[:positive], class: "user-feedback-positive") if feedback[:positive] > 0
-      concat tag.span(feedback[:neutral], class: "user-feedback-neutral") if feedback[:neutral] > 0
-      concat tag.span(feedback[:negative], class: "user-feedback-negative") if feedback[:negative] > 0
-    end
-  end
-
   private
 
   def nav_params_for(page)
@@ -125,29 +114,13 @@ module PostsHelper
     tag.span(rating_text, id: "post-rating-text", class: rating_class)
   end
 
-  def post_vote_block(post, vote, buttons: false)
-    voted = !vote.nil?
-    vote_score = voted ? vote.score : 0
-    post_score = post.score
+  def post_score_block(post)
+    tag.span(post.score, class: "post-score-#{post.id} post-score #{score_class(post.score)}", title: "#{post.up_score} up/#{post.down_score} down")
+  end
 
-    up_tag = tag.a(
-      tag.span("▲", class: "post-vote-up-#{post.id} " + confirm_score_class(vote_score, 1, buttons)),
-      class: "post-vote-up-link",
-      data: { id: post.id },
-    )
-    down_tag = tag.a(
-      tag.span("▼", class: "post-vote-down-#{post.id} " + confirm_score_class(vote_score, -1, buttons)),
-      class: "post-vote-down-link",
-      data: { id: post.id },
-    )
-    if buttons
-      score_tag = tag.span(post.score, class: "post-score-#{post.id} post-score #{score_class(post_score)}", title: "#{post.up_score} up/#{post.down_score} down")
-      CurrentUser.is_member? ? up_tag + score_tag + down_tag : ""
-    else
-      vote_block = tag.span(" (".html_safe + up_tag + " vote " + down_tag + ")")
-      score_tag = tag.span(post.score, class: "post-score-#{post.id} post-score #{score_class(post_score)}", title: "#{post.up_score} up/#{post.down_score} down")
-      score_tag + (CurrentUser.is_member? ? vote_block : "")
-    end
+  def post_score_state(post)
+    return 0 if post.nil? || post.score == 0
+    post.score > 0 ? 1 : -1
   end
 
   def score_class(score)
@@ -167,5 +140,10 @@ module PostsHelper
       ["Questionable", "q"],
       ["Explicit", "e"]
     ]
+  end
+
+  def post_short_url(post)
+    short_id = post.id.to_s(32)
+    url_for(controller: "posts_short", action: "show", id: short_id, only_path: false)
   end
 end

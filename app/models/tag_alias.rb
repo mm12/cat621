@@ -5,13 +5,13 @@ class TagAlias < TagRelationship
 
   after_save :create_mod_action
   validates :antecedent_name, uniqueness: { conditions: -> { duplicate_relevant } }, unless: :is_deleted?
+  validates :antecedent_name, tag_name: { disable_secondary_validations: true, disable_ascii_check: true }, if: :antecedent_name_changed?
   validate :absence_of_transitive_relation, unless: :is_deleted?
 
   module ApprovalMethods
     def approve!(update_topic: true, approver: CurrentUser.user)
       CurrentUser.scoped(approver) do
         update(status: "queued", approver_id: approver.id)
-        create_undo_information
         TagAliasJob.perform_later(id, update_topic)
       end
     end
@@ -91,6 +91,7 @@ class TagAlias < TagRelationship
   end
 
   def self.to_aliased_query(query, overrides: nil, comments: false)
+    query = query.dup
     # Remove tag types (newline syntax)
     query.gsub!(/(^| )(-)?(#{TagCategory::MAPPING.keys.sort_by { |x| -x.size }.join('|')}):([\S])/i, '\1\2\4')
     # Remove tag types (comma syntax)
@@ -215,6 +216,7 @@ class TagAlias < TagRelationship
     begin
       CurrentUser.scoped(approver) do
         update!(status: "processing")
+        create_undo_information
         move_aliases_and_implications
         ensure_category_consistency
         update_posts_locked_tags
@@ -255,27 +257,27 @@ class TagAlias < TagRelationship
   def move_aliases_and_implications
     aliases = TagAlias.where(["consequent_name = ?", antecedent_name])
     aliases.each do |ta|
-      ta.consequent_name = self.consequent_name
+      ta.consequent_name = consequent_name
       success = ta.save
-      if !success && ta.errors.full_messages.join("; ") =~ /Cannot alias a tag to itself/
+      if !success && ta.errors.full_messages.join("; ") =~ /Cannot alias or implicate a tag to itself/
         ta.destroy
       end
     end
 
     implications = TagImplication.where(["antecedent_name = ?", antecedent_name])
     implications.each do |ti|
-      ti.antecedent_name = self.consequent_name
+      ti.antecedent_name = consequent_name
       success = ti.save
-      if !success && ti.errors.full_messages.join("; ") =~ /Cannot implicate a tag to itself/
+      if !success && ti.errors.full_messages.join("; ") =~ /Cannot alias or implicate a tag to itself/
         ti.destroy
       end
     end
 
     implications = TagImplication.where(["consequent_name = ?", antecedent_name])
     implications.each do |ti|
-      ti.consequent_name = self.consequent_name
+      ti.consequent_name = consequent_name
       success = ti.save
-      if !success && ti.errors.full_messages.join("; ") =~ /Cannot implicate a tag to itself/
+      if !success && ti.errors.full_messages.join("; ") =~ /Cannot alias or implicate a tag to itself/
         ti.destroy
       end
     end
@@ -361,5 +363,9 @@ class TagAlias < TagRelationship
 
       ModAction.log(:tag_alias_update, {alias_id: id, alias_desc: alias_desc, change_desc: change_desc})
     end
+  end
+
+  def dtext_label
+    "[ta:#{id}]"
   end
 end

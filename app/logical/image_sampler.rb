@@ -5,6 +5,7 @@ module ImageSampler
 
   def generate_post_images(post)
     return unless File.exist?(post.file_path)
+    return if post.is_flash? # Cannot generate any kind of thumbnail
     image = image_from_path(post.file_path, is_video: post.is_video?)
     dimensions = [post.image_width, post.image_height]
 
@@ -19,9 +20,9 @@ module ImageSampler
     end
 
     # Generate samples
-    # Animated GIFs and APNGs are not needed, Flash files are not supported.
+    # Animated GIFs, APNGs, and WEBPs are not needed, Flash files are not supported.
     # All video files need samples to be used as a poster in the player.
-    return if post.is_gif? || post.is_animated_png?(post.file_path) || post.is_flash?
+    return if post.is_gif? || post.is_animated_png?(post.file_path) || post.is_animated_webp?(post.file_path)
     return unless post.is_video? || dimensions.min > Danbooru.config.large_image_width || dimensions.max > Danbooru.config.large_image_width * 2
     sample(image, dimensions, background: post.bg_color).each do |ext, file|
       path = sm.post_file_path(post, :"sample_#{ext}")
@@ -33,6 +34,7 @@ module ImageSampler
 
   def generate_replacement_images(replacement)
     return unless File.exist?(replacement.replacement_file_path)
+    return if replacement.file_ext == "swf" # Cannot generate any kind of thumbnail
     image = image_from_path(replacement.replacement_file_path, is_video: replacement.is_video?)
     dimensions = [replacement.image_width, replacement.image_height]
 
@@ -45,8 +47,16 @@ module ImageSampler
   # Creates a Vips::Image object from the provided file path.
   # If the file is a video, generates a snapshot using ffmpeg.
   def image_from_path(file_path, is_video: false)
-    file_path = gen_video_snapshot(file_path) if is_video
-    Vips::Image.new_from_file file_path
+    if is_video
+      snapshot = gen_video_snapshot(file_path)
+      # Keep `snapshot` referenced here so Ruby's GC doesn't finalize
+      # (and unlink) the Tempfile before libvips has fully read it.
+      image = Vips::Image.new_from_file(snapshot.path).copy_memory
+      snapshot.close!
+      image
+    else
+      Vips::Image.new_from_file(file_path)
+    end
   end
 
   # Generates a pair of thumbnails from the provided image.
@@ -96,7 +106,7 @@ module ImageSampler
     end
 
     output_file.close
-    output_file.path
+    output_file
   end
 
   # Calculates the dimensions of the generated image.

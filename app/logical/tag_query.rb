@@ -63,8 +63,14 @@ class TagQuery
 
   # Tags with parsed values of `true` or `false`. See `TagQuery#parse_boolean` for details.
   BOOLEAN_METATAGS = %w[
-    hassource hasdescription isparent ischild inpool pending_replacements artverified
+    hassource hasdescription isparent ischild hasparent haschild haschildren inpool pending_replacements artverified
   ].freeze
+
+  BOOLEAN_METATAG_ALIASES = {
+    "hasparent"   => "ischild",
+    "haschild"    => "isparent",
+    "haschildren" => "isparent",
+  }.freeze
 
   CATEGORY_METATAG_MAP = TagCategory::SHORT_NAME_MAPPING.to_h { |k, v| [-"#{k}tags", -"tag_count_#{v}"] }.freeze
 
@@ -75,7 +81,7 @@ class TagQuery
     commenter comm noter noteupdater
   ].concat(CATEGORY_METATAG_MAP.keys).freeze
 
-  METATAGS = %w[md5 order limit child randseed ratinglocked notelocked statuslocked].concat(
+  METATAGS = %w[md5 order limit child randseed hot_from ratinglocked notelocked statuslocked].concat(
     NEGATABLE_METATAGS, COUNT_METATAGS, BOOLEAN_METATAGS
   ).freeze
 
@@ -124,6 +130,7 @@ class TagQuery
   ORDER_NON_SUFFIXED_ALIASES = {
     "portrait"    => "aspect_ratio_asc",
     "landscape"   => "aspect_ratio",
+    "rank"        => "hot",
   }.freeze
 
   # rubocop:enable Layout/HashAlignment
@@ -135,15 +142,13 @@ class TagQuery
   ].concat(COUNT_METATAGS, CATEGORY_METATAG_MAP.keys).freeze
 
   # All possible valid values for `order` metatags; used for autocomplete.
-  # * With the exception of `rank` & `random`, all values have an option to invert the order.
+  # * With the exception of `random` & `hot`, all values have an option to invert the order.
   # * With the exception of `portrait`/`landscape`, all invertible values have a bare, `_asc`, & `_desc` variant.
   # * With the exception of `id`, all bare invertible values are equivalent to their `_desc`-suffixed counterparts.
   #
   # Add non-reversible entries to the array literal here.
-  #
-  # IDEA: Add `rank_asc` option
   ORDER_METATAGS = %w[
-    rank random
+    random hot
   ].concat(
     ORDER_INVERTIBLE_ALIASES
       .keys.concat(ORDER_INVERTIBLE_ROOTS)
@@ -159,18 +164,18 @@ class TagQuery
   ORDER_METATAGS_AUTOCOMPLETE = (ORDER_METATAGS - %w[
     id_asc
   ].concat(
-    ORDER_INVERTIBLE_ROOTS[1..].map { |e| -"#{e}_desc" },
-    CATEGORY_METATAG_MAP.keys.map { |e| -"#{e}_desc" },
-    (ORDER_INVERTIBLE_ALIASES.keys - CATEGORY_METATAG_MAP.keys.map do |e|
-      "#{TagCategory::SHORT_NAME_MAPPING[e.delete_suffix('tags')]}_tags"
+    ORDER_INVERTIBLE_ROOTS[1..].map { |e| -"#{e}_desc" }, # Remove superfluous `_desc` suffix from all but `id_desc`
+    CATEGORY_METATAG_MAP.keys.map { |e| -"#{e}_desc" }, # Remove superfluous `_desc` suffix
+    (ORDER_INVERTIBLE_ALIASES.keys - CATEGORY_METATAG_MAP.keys.map do |e| # Remove all aliased forms...
+      "#{TagCategory::SHORT_NAME_MAPPING[e.delete_suffix('tags')]}_tags" # ...for all but the full tag category names
     end).flat_map { |e| [e, -"#{e}_desc", -"#{e}_asc"] },
-    CATEGORY_METATAG_MAP.keys.map { |e| "#{TagCategory::SHORT_NAME_MAPPING[e.delete_suffix('tags')]}_tags" }.map { |e| -"#{e}_desc" },
-    ORDER_NON_SUFFIXED_ALIASES.keys - %w[portrait landscape],
-    %w[aspect_ratio aspect_ratio_asc],
-    CATEGORY_METATAG_MAP.keys.flat_map { |e| [e, -"#{e}_asc"] },
+    CATEGORY_METATAG_MAP.keys.map { |e| "#{TagCategory::SHORT_NAME_MAPPING[e.delete_suffix('tags')]}_tags" }.map { |e| -"#{e}_desc" }, # Remove superfluous `_desc` suffix
+    ORDER_NON_SUFFIXED_ALIASES.keys - %w[portrait landscape], # Remove all non-suffixed aliases except `portrait` & `landscape`
+    %w[aspect_ratio aspect_ratio_asc], # Remove the forms `portrait` & `landscape` resolve to
+    CATEGORY_METATAG_MAP.keys.flat_map { |e| [e, -"#{e}_asc"] }, # Remove the resolved forms of the full tag category forms
   )).freeze
 
-  # Should currently just be `rank` & `random`; not a constant due to only current use being tests.
+  # Should currently just be `random` & `hot`; not a constant due to only current use being tests.
   def self.order_non_invertible_roots
     (ORDER_METATAGS - ORDER_INVERTIBLE_ALIASES
     .keys.concat(ORDER_INVERTIBLE_ROOTS)
@@ -191,14 +196,15 @@ class TagQuery
   # In the general case, tags have a `_asc` suffix appended/removed.
   #
   # NOTE: With the exception of `id_desc`, values ending in `_desc` are equivalent to the same string
-  # with that suffix removed; as such, these keys, along with `id_asc`, `rank`, & `random`, are not
-  # included in this hash.
+  # with that suffix removed; as such, these keys, along with `id_asc`, `random`, & `hot`,
+  # are not included in this hash.
   ORDER_VALUE_INVERSIONS = ORDER_INVERTIBLE_ROOTS[1..].flat_map { |str| [str, -"#{str}_asc"] }.push(*ORDER_NON_SUFFIXED_ALIASES.keys, "id", "id_desc").index_with do |e|
     case e
     when "id"        then "id_desc"
     when "id_desc"   then "id"
     when "portrait"  then ORDER_NON_SUFFIXED_ALIASES["landscape"]
     when "landscape" then ORDER_NON_SUFFIXED_ALIASES["portrait"]
+    when "rank"      then ORDER_NON_SUFFIXED_ALIASES["rank"]
     else
       raise ArgumentError, -"Unhandled non-invertible alias: #{e}" if ORDER_NON_SUFFIXED_ALIASES.key?(e)
       e.end_with?("_asc") ? e.delete_suffix("_asc") : -"#{e}_asc"
@@ -209,7 +215,7 @@ class TagQuery
   # Therefore, these are pulled out of groups and placed on the top level of searches.
   #
   # Note that this includes all valid prefixes.
-  GLOBAL_METATAGS = %w[order -order limit randseed].freeze
+  GLOBAL_METATAGS = %w[order -order limit randseed hot_from].freeze
 
   # The values for the `status` metatag that will override the automatic hiding of deleted posts
   # from search results. Other tags do also alter this behavior; specifically, a `deletedby` or
@@ -228,6 +234,15 @@ class TagQuery
   ].freeze
 
   STATUS_VALUES = %w[all any pending modqueue deleted flagged active].freeze
+
+  # OpenSearch rejects bool queries with more than this many clauses. A wildcard tag like `*play*`
+  # expands to many concrete tag clauses, so we enforce the limit here with a user-facing error
+  # rather than letting the search reach OpenSearch and return a cryptic 400 response.
+  OPENSEARCH_MAX_CLAUSE_COUNT = 1024
+
+  # OpenSearch limits wildcard query automaton states to ~1000. A prefix wildcard `term*` generates
+  # roughly `len(term) + 1` states, so cap the prefix at 999 characters to stay within the limit.
+  MAX_SOURCE_WILDCARD_LENGTH = 999
 
   # Used for quickly profiling optimizations, tweaking desired behavior, etc. Should be removed
   # after reviews are completed.
@@ -302,6 +317,8 @@ class TagQuery
     else
       parse_query(query, **)
     end
+
+    q[:order] = "random" if q[:random_seed].present? && q[:order].nil?
     # raise CountExceededError if @tag_count > Danbooru.config.tag_query_limit - free_tags_count
   end
 
@@ -985,12 +1002,12 @@ class TagQuery
       end
       last_index += curr_match.end(0)
     end
-    plus_one = nil
     # For each quoted metatag, match all the non-quoted queried metatags between the end of the last
     # quoted metatag and the start of this one, then check and process this quoted metatag.
     #
     # If there's no (more) quoted metatags, then just search each metatag between the last index and the end.
-    while (quoted_m = query[last_index...query.length].presence&.match(REGEX_ANY_QUOTED_METATAG)) || (!plus_one && (plus_one = true)) # rubocop:disable Lint/LiteralAssignmentInCondition
+    loop do
+      quoted_m = query[last_index...query.length].presence&.match(REGEX_ANY_QUOTED_METATAG)
       # If there are non-quoted matches before current quoted & current quoted doesn't match, manual
       # update of last index requires the offset quoted_m was found with.
       prior_last_index = last_index
@@ -1227,7 +1244,8 @@ class TagQuery
   #
   # IDEA: Sort groups like metatags
   def parse_query(query, depth: 0, **kwargs)
-    return if (query = query.to_s.unicode_normalize(:nfc).strip.freeze).blank?
+    # Remove invalid UTF-8 sequences and null bytes before processing
+    return if (query = query.to_s.scrub("").delete("\u0000").unicode_normalize(:nfc).strip.freeze).blank?
     can_have_groups = kwargs.fetch(:can_have_groups, true) && TagQuery.has_groups?(query)
     out_of_metatags = false
     params = { preformatted_query: true, ensure_delimiting_whitespace: true, compact: true, force_delim_metatags: true, segregate_metatags: true, delim_metatags: true }.freeze
@@ -1306,7 +1324,7 @@ class TagQuery
       when "user", "-user", "~user" then add_to_query(type, :uploader_ids, user_id_or_invalid(g2))
 
       # NOTE: This doesn't match the behavior of `User.name_or_id_to_id`, as that ensures an integral, whereas this will convert leading digits of a non-numeric string.
-      when "user_id", "-user_id", "~user_id" then add_to_query(type, :uploader_ids, g2.to_i)
+      when "user_id", "-user_id", "~user_id" then add_to_query(type, :uploader_ids, ParseValue.safe_id(g2))
 
       when "approver", "-approver", "~approver"
         add_to_query(type, :approver_ids, g2, any_none_key: :approver) { user_id_or_invalid(g2) }
@@ -1340,7 +1358,11 @@ class TagQuery
 
       when "fav", "-fav", "~fav", "favoritedby", "-favoritedby", "~favoritedby"
         add_to_query(type, :fav_ids) do
-          favuser = User.find_by_name_or_id(g2) # rubocop:disable Rails/DynamicFindBy
+          if g2.downcase == "me"
+            favuser = CurrentUser.is_member? ? CurrentUser.user : nil
+          else
+            favuser = User.find_by_name_or_id(g2) # rubocop:disable Rails/DynamicFindBy
+          end
 
           next -1 unless favuser # next 0 unless favuser
           raise Favorite::HiddenError if favuser.hide_favorites?
@@ -1348,7 +1370,7 @@ class TagQuery
           favuser.id
         end
 
-      when "md5" then q[:md5] = g2.downcase.split(",")[0..99]
+      when "md5" then q[:md5] = g2.downcase.split(",").first(Danbooru.config.max_per_page)
 
       when "rating", "-rating", "~rating" then add_to_query(type, :rating, g2) if %w[s q e].include?(g2 = g2[0]&.downcase)
 
@@ -1384,22 +1406,25 @@ class TagQuery
       when "change", "-change", "~change" then add_to_query(type, :change_seq, ParseValue.range(g2))
 
       when "source", "-source", "~source"
-        add_to_query(type, :sources, g2, any_none_key: :source, wildcard: true) { "#{g2}*" }
+        truncated_source = "#{g2.first(MAX_SOURCE_WILDCARD_LENGTH)}*"
+        add_to_query(type, :sources, g2, any_none_key: :source, wildcard: true) { truncated_source }
 
       when "date", "-date", "~date" then add_to_query(type, :date, ParseValue.date_range(g2))
 
       when "age", "-age", "~age" then add_to_query(type, :age, ParseValue.invert_range(ParseValue.range(g2, :age)))
+
+      when "hot_from" then q[:hot_from] = ParseValue.date_from(g2)
 
       when "tagcount", "-tagcount", "~tagcount" then add_to_query(type, :post_tag_count, ParseValue.range(g2))
 
       when /[-~]?(#{TagCategory::SHORT_NAME_REGEX})tags/
         add_to_query(type, :"#{TagCategory::SHORT_NAME_MAPPING[$1]}_tag_count", ParseValue.range(g2))
 
-      when "parent", "-parent", "~parent" then add_to_query(type, :parent_ids, g2, any_none_key: :parent) { g2.to_i }
+      when "parent", "-parent", "~parent" then add_to_query(type, :parent_ids, g2, any_none_key: :parent) { ParseValue.safe_id(g2) }
 
       when "child" then q[:child] = g2.downcase
 
-      when "randseed" then q[:random_seed] = g2.to_i
+      when "randseed" then q[:random_seed] = ParseValue.safe_id(g2)
 
       when "order", "-order" then q[:order] = TagQuery.normalize_order_value(g2.downcase, invert: type == :must_not)
 
@@ -1425,7 +1450,7 @@ class TagQuery
       when "delreason", "-delreason", "~delreason"
         q[:status] ||= "any" unless q[:status_must_not]
         q[:show_deleted] ||= true
-        add_to_query(type, :delreason, g2, wildcard: true)
+        add_to_query(type, :delreason, g2.downcase, wildcard: true)
 
       when "deletedby", "-deletedby", "~deletedby"
         q[:status] ||= "any" unless q[:status_must_not]
@@ -1442,7 +1467,9 @@ class TagQuery
 
       when *COUNT_METATAGS then q[metatag_name.downcase.to_sym] = ParseValue.range(g2)
 
-      when *BOOLEAN_METATAGS then q[metatag_name.downcase.to_sym] = parse_boolean(g2)
+      when *BOOLEAN_METATAGS
+        canonical = BOOLEAN_METATAG_ALIASES.fetch(metatag_name.downcase, metatag_name.downcase)
+        q[canonical.to_sym] = parse_boolean(g2)
 
       else
         add_tag(token)
@@ -1484,6 +1511,7 @@ class TagQuery
       end
       if tag.include?("*")
         q[:tags][:must_not] += pull_wildcard_tags(tag.downcase)
+        check_opensearch_clause_count
       else
         q[:tags][:must_not] << tag.downcase
       end
@@ -1501,6 +1529,7 @@ class TagQuery
       end
       if tag.include?("*")
         q[:tags][:should] += pull_wildcard_tags(tag)
+        check_opensearch_clause_count
       else
         q[:tags][:must] << tag.downcase
       end
@@ -1546,10 +1575,20 @@ class TagQuery
     end
   end
 
+  def check_opensearch_clause_count
+    total = q[:tags][:must].size + q[:tags][:must_not].size + q[:tags][:should].size
+    if total > OPENSEARCH_MAX_CLAUSE_COUNT
+      raise CountExceededError.new(
+        "Tag search query is too large (#{total} tags after wildcard expansion). Reduce the number of wildcard tags or use more specific patterns.",
+        query_obj: self,
+      )
+    end
+  end
+
   def pull_wildcard_tags(tag)
     Tag.name_matches(tag)
        .limit(Danbooru.config.tag_query_limit) # .limit(tag_query_limit)
-       .order("post_count DESC")
+       .order("post_count DESC", "name ASC")
        .pluck(:name)
        .presence || ["~~not_found~~"]
   end

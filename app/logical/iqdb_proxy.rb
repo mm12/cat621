@@ -48,6 +48,8 @@ module IqdbProxy
     File.open(post.preview_file_path) do |f|
       query_file(f, score_cutoff)
     end
+  rescue Errno::ENOENT # Preview file not found
+    []
   end
 
   def query_file(file, score_cutoff)
@@ -81,7 +83,8 @@ module IqdbProxy
 
   def generate_thumbnail(file_path)
     Vips::Image.thumbnail(file_path, IQDB_NUM_PIXELS, height: IQDB_NUM_PIXELS, size: :force)
-  rescue Vips::Error
+  rescue Vips::Error => e
+    Rails.logger.error "Failed to generate thumbnail for #{file_path}: #{e.message}"
     nil
   end
 

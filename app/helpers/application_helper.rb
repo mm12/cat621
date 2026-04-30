@@ -43,7 +43,7 @@ module ApplicationHelper
 
     tag.li(id: id, class: klass) do
       link_to(url, id: "#{id}-link", **options) do
-        concat image_pack_tag(image)
+        concat vite_image_tag(image)
         concat " "
         concat tag.span(text)
       end
@@ -68,24 +68,6 @@ module ApplicationHelper
     klass = options.delete(:class)
     id = id_prefix + text.downcase.gsub(/[^a-z ]/, "").parameterize
     tag.li(link_to(text, url, id: "#{id}-link", **options), id: id, class: klass)
-  end
-
-  def dtext_ragel(text, **)
-    parsed = DText.parse(text, **)
-    return raw "" if parsed.nil?
-    deferred_post_ids.merge(parsed[1]) if parsed[1].present?
-    raw parsed[0]
-  rescue DText::Error => e
-    raw ""
-  end
-
-  def format_text(text, **options)
-    # preserve the currrent inline behaviour
-    if options[:inline]
-      dtext_ragel(text, **options)
-    else
-      raw %(<div class="styled-dtext">#{dtext_ragel(text, **options)}</div>)
-    end
   end
 
   def custom_form_for(object, *args, &)
@@ -151,7 +133,7 @@ module ApplicationHelper
     user_class += " user-post-uploader" if user.can_upload_free?
     user_class += " user-banned" if user.is_banned?
     user_class += " with-style" if CurrentUser.user.style_usernames?
-    html = link_to(user.pretty_name, user_path(user), class: user_class, rel: "nofollow")
+    html = link_to(user.pretty_name.presence || "<blank>", user_path(user), class: user_class, rel: "nofollow")
     html << " (Unactivated)" if include_activation && !user.is_verified?
     html
   end
@@ -170,7 +152,7 @@ module ApplicationHelper
         controller: controller_param,
         action: action_param,
         **data_attributes_for(user, "user", attributes),
-        disable_cropped_thumbnails: Danbooru.config.enable_image_cropping? && CurrentUser.user.disable_cropped_thumbnails?,
+        hotkeys_enabled: CurrentUser.user.enable_keyboard_navigation?,
       },
     }
   end
@@ -189,9 +171,7 @@ module ApplicationHelper
     post_id = user.avatar_id
     return "" unless post_id
     deferred_post_ids.add(post_id)
-    tag.div class: "post-thumb placeholder", id: "tp-#{post_id}", data: { id: post_id } do
-      tag.img class: "thumb-img placeholder", src: "/images/thumb-preview.png", height: 150, width: 150
-    end
+    tag.article class: "thumbnail no-stats placeholder", id: "tp-#{post_id}", data: { id: post_id, initial: user.name[0].upcase }
   end
 
   def unread_dmails(user)
@@ -202,7 +182,17 @@ module ApplicationHelper
     end
   end
 
-protected
+  def tos_content
+    Cache.fetch("tos_content", expires_in: 1.day) do
+      wiki = WikiPage.titled("e621:terms_of_service")
+      return "Terms of use not found." if wiki.nil?
+      processed_body = replace_cross_domain_links(wiki.body)
+      format_text(processed_body, allow_color: true)
+    end
+  end
+
+  protected
+
   def nav_link_match(controller, url)
     # Static routes must match completely
     return url == request.path if controller == "static"
@@ -254,5 +244,28 @@ protected
     else
       /^#{site_map_path}/
     end
+  end
+
+  VITE_ENTRYPOINTS = Rails.root.glob("app/javascript/entrypoints/v_*.ts")
+                          .to_set { |f| File.basename(f, ".ts") }
+                          .freeze
+
+  def vite_script_for_controller
+    name = "v_#{params[:controller].parameterize.dasherize}"
+    return unless VITE_ENTRYPOINTS.include?(name)
+    vite_javascript_tag("#{name}.ts", nonce: content_security_policy_nonce, defer: false, skip_preload_tags: true)
+  end
+
+  def vite_script_for_controller_and_action
+    name = "v_#{params[:controller].parameterize.dasherize}_#{params[:action].parameterize.dasherize}"
+    return unless VITE_ENTRYPOINTS.include?(name)
+    vite_javascript_tag("#{name}.ts", nonce: content_security_policy_nonce, defer: false, skip_preload_tags: true)
+  end
+
+  private
+
+  def replace_cross_domain_links(text)
+    current_domain = Danbooru.config.domain
+    text.gsub(%r{https://(?:e621\.net|e926\.net)(/static/)}, "https://#{current_domain}\\1")
   end
 end
