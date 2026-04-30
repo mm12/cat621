@@ -27,7 +27,7 @@ RSpec.describe PostReplacement do
     it "creates an original backup when the first replacement is created" do
       replacement_file = uploaded_file("sample.png", "image/png")
 
-      expect {
+      expect do
         post.replacements.create!(
           creator: creator,
           creator_ip_addr: "127.0.0.1",
@@ -35,7 +35,7 @@ RSpec.describe PostReplacement do
           reason: "A sufficient replacement reason",
           is_backup: false,
         )
-      }.to change { post.replacements.count }.by(2)
+      end.to change { post.replacements.count }.by(2)
 
       statuses = post.replacements.reload.map(&:status)
       expect(statuses).to include("original", "pending")
@@ -44,7 +44,7 @@ RSpec.describe PostReplacement do
     it "raises when the post cannot be backed up" do
       allow(storage_manager).to receive(:open).and_raise(StandardError, "missing file")
 
-      expect {
+      expect do
         post.replacements.create!(
           creator: creator,
           creator_ip_addr: "127.0.0.1",
@@ -52,7 +52,7 @@ RSpec.describe PostReplacement do
           reason: "A sufficient replacement reason",
           is_backup: false,
         )
-      }.to raise_error(ProcessingError, /Failed to create backup/)
+      end.to raise_error(ProcessingError, /Failed to create backup/)
     end
 
     it "creates a non-duplicate replacement submission" do
@@ -83,7 +83,7 @@ RSpec.describe PostReplacement do
     end
 
     it "increments the user's pending replacement count" do
-      expect {
+      expect do
         post.replacements.create(
           creator: creator,
           creator_ip_addr: "127.0.0.1",
@@ -91,7 +91,7 @@ RSpec.describe PostReplacement do
           reason: "A sufficient replacement reason",
           is_backup: false,
         )
-      }.to change { creator.post_replacements.pending.count }.by(1)
+      end.to change { creator.post_replacements.pending.count }.by(1)
     end
   end
 end
