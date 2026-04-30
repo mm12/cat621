@@ -138,7 +138,7 @@ RSpec.describe PostReplacementsController do
   describe "POST /post_replacements success paths" do
     before do
       allow_any_instance_of(StorageManager::Local).to receive(:open) do
-        File.open(Rails.root.join("spec/fixtures/files/sample.png"))
+        Rails.root.join("spec/fixtures/files/sample.png").open
       end
     end
 
@@ -155,9 +155,9 @@ RSpec.describe PostReplacementsController do
       }
 
       sign_in_as replacer
-      expect {
+      expect do
         post post_replacements_path, params: params
-      }.to change { post_record.replacements.count }.by(1)
+      end.to change { post_record.replacements.count }.by(1)
 
       post_record.reload
       expect(response.parsed_body["location"]).to eq(post_path(post_record))
@@ -206,7 +206,7 @@ RSpec.describe PostReplacementsController do
     it "creates a ticket for a destroyed post when notify is enabled" do
       destroyed_post = create(
         :destroyed_post,
-        md5: Digest::MD5.file(Rails.root.join("spec/fixtures/files", "sample.png")).hexdigest,
+        md5: Digest::MD5.file(Rails.root.join("spec/fixtures/files/sample.png")).hexdigest,
         notify: true,
       )
 
@@ -220,9 +220,9 @@ RSpec.describe PostReplacementsController do
       }
 
       sign_in_as replacer
-      expect {
+      expect do
         post post_replacements_path, params: params
-      }.to change(Ticket, :count).by(1)
+      end.to change(Ticket, :count).by(1)
       expect(PostReplacement.count).to eq(1)
       expect(destroyed_post.notify).to be true
     end
@@ -230,7 +230,7 @@ RSpec.describe PostReplacementsController do
     it "does not create a ticket for a destroyed post when notify is disabled" do
       create(
         :destroyed_post,
-        md5: Digest::MD5.file(Rails.root.join("spec/fixtures/files", "sample.png")).hexdigest,
+        md5: Digest::MD5.file(Rails.root.join("spec/fixtures/files/sample.png")).hexdigest,
         notify: false,
       )
 
@@ -244,9 +244,9 @@ RSpec.describe PostReplacementsController do
       }
 
       sign_in_as approver
-      expect {
+      expect do
         post post_replacements_path, params: params
-      }.not_to change(Ticket, :count)
+      end.not_to change(Ticket, :count)
     end
   end
 
@@ -364,9 +364,9 @@ RSpec.describe PostReplacementsController do
 
     it "changes the status to rejected for an approver" do
       sign_in_as approver
-      expect {
+      expect do
         put reject_post_replacement_path(post_replacement, format: :json)
-      }.to change { post_replacement.reload.status }.from("pending").to("rejected")
+      end.to change { post_replacement.reload.status }.from("pending").to("rejected")
     end
   end
 
@@ -427,9 +427,9 @@ RSpec.describe PostReplacementsController do
       sign_in_as approver
       approved_replacement.update_columns(penalize_uploader_on_approve: false)
 
-      expect {
+      expect do
         put toggle_penalize_post_replacement_path(approved_replacement, format: :json)
-      }.to change { approved_replacement.reload.penalize_uploader_on_approve }.from(false).to(true)
+      end.to change { approved_replacement.reload.penalize_uploader_on_approve }.from(false).to(true)
     end
   end
 
@@ -502,16 +502,16 @@ RSpec.describe PostReplacementsController do
 
     before do
       allow_any_instance_of(StorageManager::Local).to receive(:open) do
-        File.open(Rails.root.join("spec/fixtures/files/sample.png"))
+        Rails.root.join("spec/fixtures/files/sample.png").open
       end
     end
 
     it "creates a new post from the replacement for an approver" do
       sign_in_as approver
 
-      expect {
+      expect do
         post promote_post_replacement_path(real_replacement, format: :json)
-      }.to change(Post, :count).by(1)
+      end.to change(Post, :count).by(1)
 
       expect(real_replacement.reload.status).to eq("promoted")
     end
