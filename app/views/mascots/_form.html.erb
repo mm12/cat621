@@ -1,6 +1,6 @@
 <%= custom_form_for(mascot) do |f| %>
   <%= error_messages_for "mascot" %>
-  <%= f.input :mascot_file, as: :file, input_html: { accept: "image/png,image/jpeg,.png,.jpg,.jpeg" } %>
+  <%= f.input :mascot_file, as: :file, input_html: { accept: mascot.accepted_file_types(include_mimes: true, allow_videos: false).join(",") } %>
   <%= f.input :display_name %>
   <%= f.input :background_color %>
   <%= f.input :foreground_color %>

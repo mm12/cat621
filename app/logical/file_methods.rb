@@ -11,6 +11,40 @@ module FileMethods
     webp: "webp",
   }.freeze
 
+  def accepted_mime_types(allow_images: true, allow_videos: true, allow_flash: false)
+    # Get the MIME types corresponding to the allowed file extensions
+    mimes = FILE_TYPE.values.flat_map do |ext|
+      value = []
+      value << Marcel::MimeType.for(extension: ext)
+      value << "application/x-shockwave-flash" if ext == "swf" # Flash has multiple MIME types
+      value
+    end
+    # filter the MIME types based on the allowed categories
+    mimes.select do |mime|
+      (allow_images && mime.start_with?("image/")) ||
+        (allow_videos && mime.start_with?("video/")) ||
+        (allow_flash && mime == "application/x-shockwave-flash")
+    end
+  end
+
+  def accepted_file_types(allow_images: true, allow_videos: true, allow_flash: false,
+                          include_mimes: false, include_extensions: true)
+    accepted_mime_types(allow_images: allow_images, allow_videos: allow_videos, allow_flash: allow_flash).flat_map do |mime|
+      value = []
+      if include_mimes
+        value << mime
+      end
+      if include_extensions # include the file extension (e.g. ".png")
+        if mime.start_with?("application/x-shockwave-flash")
+          value << ".swf"
+        else
+          value << ".#{mime.split('/').last}" # strip off the type prefix (e.g. "image/") and prepend a dot
+        end
+      end
+      value
+    end
+  end
+
   def is_of_type?(type)
     file_ext == FileMethods::FILE_TYPE[type]
   end
