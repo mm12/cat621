@@ -16,6 +16,7 @@
   <div
     id="replacement-uploader"
     class="simple_form"
+    data-accept-file-types="<%= html_escape(PostReplacement.new.accepted_file_types(include_mimes: true).join(",")) %>"
     data-max-file-size="<%= Danbooru.config.max_file_size %>"
     data-max-file-size-map="<%= html_escape(Danbooru.config.max_file_sizes.to_json) %>"
   ></div>

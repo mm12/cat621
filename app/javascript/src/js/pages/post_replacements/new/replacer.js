@@ -15,6 +15,7 @@ const ReplacerModule = {
 
     const dataset = replacerElement.dataset;
     window.uploaderSettings = {
+      acceptFileTypes: dataset.acceptFileTypes || "",
       maxFileSize: parseInt(dataset.maxFileSize || "0"),
       maxFileSizeMap: JSON.parse(dataset.maxFileSizeMap || "{}"),
     };

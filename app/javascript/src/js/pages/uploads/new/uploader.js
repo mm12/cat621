@@ -22,6 +22,7 @@ const UploaderModule = {
       allowLockedTags: dataset.allowLockedTags === "true",
       allowRatingLock: dataset.allowRatingLock === "true",
       allowUploadAsPending: dataset.allowUploadAsPending === "true",
+      acceptFileTypes: dataset.acceptFileTypes || "",
       maxFileSize: parseInt(dataset.maxFileSize || "0"),
       maxFileSizeMap: JSON.parse(dataset.maxFileSizeMap || "{}"),
       verifiedArtistTags: JSON.parse(dataset.verifiedArtistTags || "[]"),
