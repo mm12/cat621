@@ -42,7 +42,7 @@ module AiMethods
   # Returns a hash with :score (0..100) and :reason (string).
   def is_ai_generated?(file_path)
     file_ext = File.extname(file_path).downcase.delete_prefix(".")
-    return { score: 0, reason: "not an image" } unless %w[png jpg jpeg gif].include?(file_ext)
+    return { score: 0, reason: "not an image" } unless %w[png jpg jpeg gif webp avif].include?(file_ext)
     return { score: 0, reason: "file not found" } unless File.exist?(file_path)
 
     # Cache file type checks

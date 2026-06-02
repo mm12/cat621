@@ -21,7 +21,7 @@
           type="file"
           ref="post_file"
           id="file-input"
-          accept="image/png,.png,image/apng,.apng,image/jpeg,.jpg,.jpeg,image/gif,.gif,video/webm,.webm,video/mp4,.mp4,image/webp,.webp"
+          accept="image/png,.png,image/apng,.apng,image/jpeg,.jpg,.jpeg,image/gif,.gif,video/webm,.webm,video/mp4,.mp4,image/webp,.webp,image/avif,.avif"
           @change="updatePreviewFile"
           :disabled="disableFileUpload"
         />
