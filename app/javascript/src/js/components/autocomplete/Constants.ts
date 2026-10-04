@@ -13,8 +13,8 @@ export default class Constants {
     locked: ["rating", "note", "status"],
     child: ["any", "none"],
     parent: ["any", "none"],
-    filetype: ["jpg", "png", "gif", "swf", "webm", "mp4", "webp"],
-    type: ["jpg", "png", "gif", "swf", "webm", "mp4", "webp"], // Consider passing these from the back-end as well
+    filetype: ["jpg", "png", "gif", "swf", "webm", "mp4", "webp", "avif"],
+    type: ["jpg", "png", "gif", "swf", "webm", "mp4", "webp", "avif"], // Consider passing these from the back-end as well
   };
 
   static readonly FILETYPE_ALIASES: Record<string, string> = {
