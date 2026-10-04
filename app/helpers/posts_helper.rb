@@ -43,7 +43,7 @@ module PostsHelper
       short_url = url.omit(:scheme).to_s.sub(%r{^/+}, "").sub(%r{/+$}, "")
       source_link = decorated_link_to(short_url, url.to_s, target: "_blank", rel: "nofollow noreferrer noopener")
 
-      if CurrentUser.is_janitor?
+      if CurrentUser.is_staff?
         # remove ?query=test#example
         url_no_final_path = url.omit(:query, :fragment)
         # remove last /part
@@ -75,7 +75,7 @@ module PostsHelper
 
     html << " (#{link_to("learn more", wiki_pages_path(:title => "e621:post_relationships"))}) "
 
-    html << link_to("show »", "#", id: "has-parent-relationship-preview-link")
+    html << link_to("show »", "#", id: "has-parent-relationship-preview-link", data: { hotkey: "postrel" })
 
     html.html_safe
   end
@@ -89,7 +89,7 @@ module PostsHelper
 
     html << " (#{link_to("learn more", wiki_pages_path(:title => "e621:post_relationships"))}) "
 
-    html << link_to("show »", "#", id: "has-children-relationship-preview-link")
+    html << link_to("show »", "#", id: "has-children-relationship-preview-link", data: { hotkey: "postrel" })
 
     html.html_safe
   end

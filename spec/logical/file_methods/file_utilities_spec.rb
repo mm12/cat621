@@ -65,6 +65,14 @@ RSpec.describe FileMethods, type: :model do
         upload = build(:upload, file_ext: "avif")
         path = file_fixture("sample.avif").to_s
         expect(upload.calculate_dimensions(path)).to eq([256, 256])
+
+    context "with a JPEG rotated via EXIF orientation" do
+      # exif-orientation.jpg: 40x30 raster with orientation=8 (90° CCW),
+      # so it displays as 30x40.
+      it "returns the displayed [width, height]" do
+        upload = build(:upload, file_ext: "jpg")
+        path = file_fixture("exif-orientation.jpg").to_s
+        expect(upload.calculate_dimensions(path)).to eq([30, 40])
       end
     end
 
@@ -88,6 +96,14 @@ RSpec.describe FileMethods, type: :model do
       it "returns [0, 0]" do
         upload = build(:upload, file_ext: "swf")
         expect(upload.calculate_dimensions("/nonexistent/path.swf")).to eq([0, 0])
+      end
+    end
+
+    context "when ffprobe fails to retrieve video dimensions" do
+      it "raises an error" do
+        upload = build(:upload, file_ext: "mp4")
+        allow(Open3).to receive(:capture3).with(Danbooru.config.ffprobe_path, any_args).and_return(["", "ffprobe error", instance_double(Process::Status, success?: false)])
+        expect { upload.calculate_dimensions("/path/to/video.mp4") }.to raise_error(Upload::Error, "Could not retrieve video dimensions")
       end
     end
   end

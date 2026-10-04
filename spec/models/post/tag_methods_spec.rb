@@ -192,6 +192,44 @@ RSpec.describe Post do
           post.update!(tag_string: "#{post.tag_string} source:https://example.com")
           expect(post.reload.source).to include("example.com")
         end
+
+        it "clears the source when 'source:none' is in the tag_string" do
+          post = create(:post, source: "https://example.com")
+          post.update!(tag_string: "#{post.tag_string} source:none") # equiv to :tag_string => "source:none"
+          expect(post.reload.source).to be_empty
+        end
+
+        it "add a source when '+source:url' is in the tag_string" do
+          post = create(:post, source: "foobar")
+          post.update!(tag_string: "#{post.tag_string} +source:baz_quux")
+          expect(post.reload.source).to eq("foobar\nbaz_quux")
+        end
+
+        it "set source when '+source:url' is in the tag_string" do
+          # shouldn't treat the empty source as an existing one, which would result in a newline before
+          post = create(:post, source: "")
+          post.update!(tag_string: "#{post.tag_string} +source:https://example.com")
+          expect(post.reload.source).to include("example.com")
+          expect(post.reload.source).not_to include("\n")
+        end
+
+        it "accepts quoted +source values" do
+          post = create(:post, source: "")
+          post.update!(tag_string: "#{post.tag_string} +source:\"https://example.com\"")
+          expect(post.reload.source).to eq("https://example.com")
+        end
+
+        it "skips +source:none" do
+          post = create(:post, source: "foobar")
+          post.update!(tag_string: "#{post.tag_string} +source:none")
+          expect(post.reload.source).to eq("foobar")
+        end
+
+        it "applies multiple +source values in order" do
+          post = create(:post, source: "foobar")
+          post.update!(tag_string: "#{post.tag_string} +source:baz_quux +source:qux_corge")
+          expect(post.reload.source).to eq("foobar\nbaz_quux\nqux_corge")
+        end
       end
     end
 
@@ -308,6 +346,20 @@ RSpec.describe Post do
           expect(child.parent_id).to eq(parent_b.id)
         end
       end
+
+      describe "when old_description matches submitted description (user did not intend to change it)" do
+        it "reverts description to the previous value in memory after validation" do
+          post = create(:post, description: "Old description")
+          post.update_columns(description: "New description")
+          post.reload
+
+          post.old_description = "Old description"
+          post.description = "Old description"
+          post.valid?
+
+          expect(post.description).to eq("New description")
+        end
+      end
     end
 
     describe "normalize_tags — locked_tags blank string → nil" do
@@ -342,6 +394,34 @@ RSpec.describe Post do
         filetype_tags = %w[video animated_gif animated_png] + FileMethods::FILE_TYPE.values
         post = create(:post, tag_string: filetype_tags.join(" "))
         expect(post.tag_array).to be_empty
+      end
+
+      describe "animated_* tags" do
+        it "adds animated_gif/png/webp when the file is animated" do
+          { "gif" => "animated_gif", "png" => "animated_png", "webp" => "animated_webp" }.each do |ext, tag|
+            post = create(:post, file_ext: ext, is_animated: true)
+            expect(post.tag_array).to include(tag)
+          end
+        end
+
+        it "does not add animated_png for a static png" do
+          post = create(:post, file_ext: "png", is_animated: false,
+                               tag_string: "#{TagCategory::REVERSE_MAPPING[1]}:artist_tag animated_png " + (1..10).map { |i| "gen_#{i}" }.join(" "))
+          expect(post.tag_array).not_to include("animated_png")
+        end
+
+        # Regression for the reported bug: a user could remove animated_png and
+        # nothing re-added it, which let has_sample? falsely report a sample.
+        it "re-adds an animated_png a user removed, keeping has_sample? false" do
+          post = create(:post, file_ext: "png", is_animated: true, image_width: 2000, image_height: 2000)
+          expect(post.tag_array).to include("animated_png")
+
+          without_tag = post.tag_array.reject { |t| t == "animated_png" }.join(" ")
+          post.update!(tag_string: without_tag)
+
+          expect(post.reload.tag_array).to include("animated_png")
+          expect(post.has_sample?).to be false
+        end
       end
     end
 
@@ -435,7 +515,7 @@ RSpec.describe Post do
           post_set = create(:post_set, creator: CurrentUser.user)
           post = create(:post)
           post.update!(tag_string: "#{post.tag_string} set:#{post_set.id}")
-          expect(post.reload.set_ids).to include(post_set.id)
+          expect(post.reload.post_sets).to include(post_set)
         end
       end
 
@@ -445,7 +525,7 @@ RSpec.describe Post do
           post = create(:post)
           post_set.add!(post)
           post.update!(tag_string: "#{post.tag_string} -set:#{post_set.id}")
-          expect(post.reload.set_ids).not_to include(post_set.id)
+          expect(post.reload.post_sets).not_to include(post_set)
         end
       end
 
@@ -454,7 +534,7 @@ RSpec.describe Post do
           post_set = create(:post_set, creator: CurrentUser.user)
           post = create(:post)
           post.update!(tag_string: "#{post.tag_string} set:#{post_set.shortname}")
-          expect(post.reload.set_ids).to include(post_set.id)
+          expect(post.reload.post_sets).to include(post_set)
         end
       end
 
@@ -464,7 +544,7 @@ RSpec.describe Post do
           post = create(:post)
           post_set.add!(post)
           post.update!(tag_string: "#{post.tag_string} -set:#{post_set.shortname}")
-          expect(post.reload.set_ids).not_to include(post_set.id)
+          expect(post.reload.post_sets).not_to include(post_set)
         end
       end
 
@@ -678,6 +758,41 @@ RSpec.describe Post do
       it "returns an empty array when the post has no artist, copyright, or character tags" do
         post = create(:post, tag_string: (1..10).map { |i| "gen_only_#{i}" }.join(" "))
         expect(post.avoid_posting_tags).to eq([])
+      end
+
+      # The raw tag string of an unsaved post has not gone through normalize_tags yet,
+      # so the check must canonicalize the input itself to match the eventual result.
+      it "matches differently-cased tags on an unsaved post" do
+        artist = create(:artist)
+        avoid = create(:avoid_posting, artist: artist)
+        post = build(:post, tag_string: artist.name.upcase)
+        expect(post.avoid_posting_tags).to include(avoid)
+      end
+
+      it "matches aliases of DNP tags on an unsaved post" do
+        artist = create(:artist)
+        avoid = create(:avoid_posting, artist: artist)
+        create(:active_tag_alias, antecedent_name: "#{artist.name}_(artist)", consequent_name: artist.name)
+        post = build(:post, tag_string: "#{artist.name}_(artist)")
+        expect(post.avoid_posting_tags).to include(avoid)
+      end
+
+      it "matches tags with a category prefix on an unsaved post" do
+        artist = create(:artist)
+        avoid = create(:avoid_posting, artist: artist)
+        post = build(:post, tag_string: "artist:#{artist.name}")
+        expect(post.avoid_posting_tags).to include(avoid)
+      end
+
+      # Persisted tag strings are always normalized, so the alias lookup would be
+      # a wasted query on every render of the avoid-posting notice.
+      it "does not resolve aliases for a persisted post with a clean tag string" do
+        artist = create(:artist)
+        avoid = create(:avoid_posting, artist: artist)
+        post = Post.find(create(:post, tag_string: "artist:#{artist.name} " + (1..10).map { |i| "gen_#{i}" }.join(" ")).id)
+        allow(TagAlias).to receive(:to_aliased).and_call_original
+        expect(post.avoid_posting_tags).to include(avoid)
+        expect(TagAlias).not_to have_received(:to_aliased)
       end
     end
   end

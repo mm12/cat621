@@ -1,15 +1,16 @@
 $levels: (
-  "blocked"
-  "member"
-  "privileged"
-  "former-staff"
-  "janitor"
-  "moderator"
-  "admin"
+  "blocked",
+  "member",
+  "privileged",
+  "former-staff",
+  "staff",
+  "janitor",
+  "moderator",
+  "admin",
 );
 
 @each $level in $levels {
-  a.user-#{$level}.with-style {
+  a.user-#{$level} {
     color: themed("color-user-#{$level}");
 
     &:hover {
@@ -18,7 +19,7 @@ $levels: (
   }
 }
 
-a.user-blocked.with-style {
+a.user-blocked {
   text-decoration: line-through;
 }
 

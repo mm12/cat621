@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class AvatarCropJob < ApplicationJob
-  queue_as :default
+  sidekiq_options queue: "default"
 
   def perform(user_id, post_id, pos_x, pos_y, width)
     user = User.find(user_id)
@@ -13,6 +13,7 @@ class AvatarCropJob < ApplicationJob
     flag = User.flag_value_for("has_cropped_avatar")
     user.update_columns(bit_prefs: user.bit_prefs | flag)
     user.touch # otherwise, the old avatar may still be cached for a while
+    UserAvatarUrlCache.invalidate(user_id)
   rescue ActiveRecord::RecordNotFound
     nil
   end

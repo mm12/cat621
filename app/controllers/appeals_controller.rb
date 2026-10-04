@@ -24,14 +24,14 @@ class AppealsController < ApplicationController
   def new
     @appeal = Appeal.new(qtype: params[:qtype], disp_id: params[:disp_id])
 
-    # These messages will have to be moved to AppealTypes if anything else than deletion becomes appealable
     if (existing_appeal = @appeal.find_duplicate_for(CurrentUser.user)).present?
-      redirect_to appeal_path(existing_appeal), alert: "This deletion has already been appealed."
+      redirect_to appeal_path(existing_appeal), alert: @appeal.messages[:duplicate]
       return
     end
 
     unless @appeal.can_create_for?(CurrentUser.user)
-      redirect_to appeals_path, alert: "This deletion can't be appealed or has already been resolved."
+      redirect_path = @appeal.content_path || appeals_path
+      redirect_to redirect_path, alert: @appeal.messages[:cannot_create]
       return
     end
 
@@ -79,6 +79,9 @@ class AppealsController < ApplicationController
     if @appeal.valid?
       not_changed = appeal_params[:send_update_dmail].to_s.truthy? && (!@appeal.saved_change_to_response? && !@appeal.saved_change_to_status?)
       flash[:notice] = "Not sending update, no changes" if not_changed
+    else
+      flash[:notice] = "Error: #{@appeal.errors.full_messages.join(', ')}"
+      return redirect_to(appeal_path(@appeal))
     end
 
     respond_with(@appeal)

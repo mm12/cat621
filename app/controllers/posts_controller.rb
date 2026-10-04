@@ -3,9 +3,9 @@
 class PostsController < ApplicationController
   include JsonResponseHelper
 
-  before_action :member_only, except: %i[show show_seq index random]
+  before_action :member_only, except: %i[show show_seq index random count]
   before_action :admin_only, only: [:update_iqdb]
-  before_action :ensure_lockdown_disabled, except: %i[index show show_seq random]
+  before_action :ensure_lockdown_disabled, except: %i[index show show_seq random count]
   respond_to :html, :json
 
   def index
@@ -61,6 +61,19 @@ class PostsController < ApplicationController
     end
   end
 
+  def count
+    query = tag_query
+    unless query.is_a?(String)
+      render_expected_error(400, "Invalid tags parameter", format: :json)
+      return
+    end
+
+    max_count = (Danbooru.config.max_numbered_pages * Danbooru.config.max_per_page) + 1
+    search = Post.tag_match(query)
+    total = search.count_only(max_count: max_count)
+    render json: { count: total, capped: search.count_capped? }
+  end
+
   def show
     @post = Post.includes(:uploader, :approver).find(params[:id])
 
@@ -78,7 +91,7 @@ class PostsController < ApplicationController
 
     if request.format.html? && @post.comment_count > 0
       @comments = @post.comments.above_threshold.includes(:creator, :updater).to_a
-      Comment.preload_vote_by!(@comments, CurrentUser.id) unless CurrentUser.user&.is_anonymous?
+      Comment.preload_vote_by!(@comments, CurrentUser.id) unless CurrentUser.user&.is_logged_out?
     else
       @comments = Comment.none
     end
@@ -105,7 +118,7 @@ class PostsController < ApplicationController
 
     if request.format.html? && @post.comment_count > 0
       @comments = @post.comments.above_threshold.includes(:creator, :updater).to_a
-      Comment.preload_vote_by!(@comments, CurrentUser.id) unless CurrentUser.user&.is_anonymous?
+      Comment.preload_vote_by!(@comments, CurrentUser.id) unless CurrentUser.user&.is_logged_out?
     else
       @comments = Comment.none
     end
@@ -251,7 +264,7 @@ class PostsController < ApplicationController
       edit_reason
     ]
     permitted_params += %i[is_rating_locked] if CurrentUser.is_privileged?
-    permitted_params += %i[is_note_locked bg_color] if CurrentUser.is_janitor?
+    permitted_params += %i[is_note_locked bg_color] if CurrentUser.is_staff?
     permitted_params += %i[is_comment_locked] if CurrentUser.is_moderator?
     permitted_params += %i[is_status_locked is_comment_disabled locked_tags hide_from_anonymous hide_from_search_engines hide_favorites_list] if CurrentUser.is_admin?
 

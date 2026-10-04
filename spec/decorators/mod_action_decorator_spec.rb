@@ -28,6 +28,18 @@ RSpec.describe ModActionDecorator do
       end
     end
 
+    context "with staff file actions" do
+      it "staff_file_create includes the file id, filename, and uploader link" do
+        desc = decorate(:staff_file_create, { "id" => 3, "filename" => "evidence.zip", "file_size" => 1024, "user_id" => target_user.id }).format_description
+        expect(desc).to include("staff file #3", "evidence.zip", target_user.name)
+      end
+
+      it "staff_file_delete includes the file id and filename" do
+        desc = decorate(:staff_file_delete, { "id" => 3, "filename" => "evidence.zip", "user_id" => target_user.id }).format_description
+        expect(desc).to include("Deleted staff file #3", "evidence.zip")
+      end
+    end
+
     context "with takedown actions" do
       it "takedown_process includes takedown id" do
         desc = decorate(:takedown_process, { "takedown_id" => 7 }).format_description
@@ -67,6 +79,28 @@ RSpec.describe ModActionDecorator do
         result = CurrentUser.scoped(member, "127.0.0.1") { decorator.format_description }
         expect(result).to eq("Removed ip ban")
         expect(result).not_to include("1.2.3.4")
+      end
+    end
+
+    context "with search trend actions" do
+      it "search_trend_blacklist_create includes tag" do
+        desc = decorate(:search_trend_blacklist_create, { "tag" => "testtag" }).format_description
+        expect(desc).to include("testtag")
+      end
+
+      it "search_trend_blacklist_update includes tag" do
+        desc = decorate(:search_trend_blacklist_update, { "tag" => "testtag" }).format_description
+        expect(desc).to include("testtag")
+      end
+
+      it "search_trend_blacklist_delete includes tag" do
+        desc = decorate(:search_trend_blacklist_delete, { "tag" => "testtag" }).format_description
+        expect(desc).to include("testtag")
+      end
+
+      it "search_trend_blacklist_purge includes tag and deleted count" do
+        desc = decorate(:search_trend_blacklist_purge, { "tag" => "testtag", "deleted_count" => 5 }).format_description
+        expect(desc).to include("testtag", "5")
       end
     end
 
@@ -288,6 +322,16 @@ RSpec.describe ModActionDecorator do
       it "user_upload_limit_change includes old and new limit" do
         desc = decorate(:user_upload_limit_change, { "user_id" => target_user.id, "old_upload_limit" => 10, "new_upload_limit" => 20 }).format_description
         expect(desc).to include("10", "20")
+      end
+
+      it "user_karma_change includes old and new karma" do
+        desc = decorate(:user_karma_change, { "user_id" => target_user.id, "old_karma" => 5, "new_karma" => -20 }).format_description
+        expect(desc).to include("karma", "5", "-20")
+      end
+
+      it "user_karma_free_toggle includes disabled state" do
+        desc = decorate(:user_karma_free_toggle, { "user_id" => target_user.id, "disabled" => true }).format_description
+        expect(desc).to include("Disabled", target_user.name)
       end
 
       it "user_custom_title_change includes old and new title" do

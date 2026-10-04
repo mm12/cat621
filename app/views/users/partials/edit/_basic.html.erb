@@ -19,17 +19,6 @@
   </tab-body>
 </tab-entry>
 
-<% if CurrentUser.user.is_member? %>
-<tab-entry tab="<%= tab_name %>" group="account" class="with-button" search="update change user profile account api key access">
-  <tab-head>API Keys</tab-head>
-  <tab-body>
-    <%= link_to "Manage API Keys", api_keys_path, class: "st-button" %>
-  </tab-body>
-  <tab-hint>
-    Do not give your API keys to third-party apps you do not trust.
-  </tab-hint>
-</tab-entry>
-<% end %>
 
 <tab-entry tab="<%= tab_name %>" group="account" class="" id="settings-account-buttons" search="update change user profile account delete password">
   <tab-head></tab-head>
@@ -100,8 +89,8 @@
   </tab-body>
 </tab-entry>
 
-<tab-entry tab="<%= tab_name %>" group="profile" class="bigtext" search="user profile commission info">
-  <tab-head><%= form.label :profile_artinfo, "Commission Info" %></tab-head>
+<tab-entry tab="<%= tab_name %>" group="profile" class="bigtext" search="user profile artist info">
+  <tab-head><%= form.label :profile_artinfo, "Artist Info" %></tab-head>
   <tab-body>
     <%= form.input_field :profile_artinfo,
       as: :dtext,
@@ -160,7 +149,7 @@
   </tab-hint>
 </tab-entry>
 
-<tab-entry tab="<%= tab_name %>" group="posts" class="inline" search="posts comments show hide display own hidden">
+<tab-entry tab="<%= tab_name %>" group="posts" class="inline" search="posts comments show hide display own all your hidden">
   <tab-head><%= form.label :show_hidden_comments, "Show #{CurrentUser.user.is_staff? ? 'all' : 'your'} hidden comments" %></tab-head>
   <tab-body>
     <%= form.input_field :show_hidden_comments, as: :boolean, class: "st-toggle" %>

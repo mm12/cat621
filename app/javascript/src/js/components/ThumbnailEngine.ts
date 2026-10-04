@@ -1,10 +1,8 @@
-import E621Type from "@/interfaces/E621";
+import Blacklist from "@/core/blacklist";
+import CurrentUser from "@/models/CurrentUser";
 import PostCache, { CachedPost } from "@/models/PostCache";
-import User from "@/models/User";
 import Settings from "@/utility/Settings";
 import SVGIcon from "@/utility/SVGIcon";
-
-declare const E621: E621Type;
 
 export default class ThumbnailEngine {
 
@@ -30,8 +28,8 @@ export default class ThumbnailEngine {
     if (post.isDeleted || post.isUnavailable) article.addClass("deleted");
 
     // Apply customization and blacklist classes
-    if (E621.Blacklist.hiddenPosts.has(post.id)) article.addClass("blacklisted");
-    if (E621.Blacklist.matchedPosts.has(post.id)) article.addClass("filter-matches");
+    if (Blacklist.hiddenPosts.has(post.id)) article.addClass("blacklisted");
+    if (Blacklist.matchedPosts.has(post.id)) article.addClass("filter-matches");
 
     if (!showStatistics) article.addClass("no-stats");
     if (!showTypeBadges) article.addClass("no-type-badges");
@@ -57,10 +55,11 @@ export default class ThumbnailEngine {
       .attr({
         "href": `/posts/${post.id}`,
         "data-target": post.id, // Used by Analytics
+        "data-file-ext": post.file_ext, // used by the badge pseudoelement
       })
       .appendTo(article);
 
-    if (!post.isUnavailable && (!post.isDeleted || User.is.janitor))
+    if (!post.isUnavailable && (!post.isDeleted || CurrentUser.is.staff))
       link.append(this.renderPicture(post));
 
     // Footer

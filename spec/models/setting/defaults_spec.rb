@@ -15,6 +15,7 @@ RSpec.describe Setting do
     # -------------------------------------------------------------------------
     describe "lockdown" do
       it { expect(Setting.uploads_disabled).to be(false) }
+      it { expect(Setting.post_replacements_disabled).to be(false) }
       it { expect(Setting.pools_disabled).to be(false) }
       it { expect(Setting.post_sets_disabled).to be(false) }
       it { expect(Setting.comments_disabled).to be(false) }
@@ -30,7 +31,7 @@ RSpec.describe Setting do
     # limits
     # -------------------------------------------------------------------------
     describe "limits" do
-      it { expect(Setting.uploads_min_level).to eq(User::Levels::MEMBER) }
+      it { expect(Setting.uploads_min_level).to eq(UserLevel::MEMBER) }
       it { expect(Setting.hide_pending_posts_for).to eq(0) }
     end
 

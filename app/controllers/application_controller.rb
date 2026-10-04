@@ -4,13 +4,31 @@ class ApplicationController < ActionController::Base
   class APIThrottled < StandardError; end
   class FeatureUnavailable < StandardError; end
 
-  # NOTE: this gets flagged by CodeQL as a CSRF vulnerability, but it's a false positive.
-  # This check is only skipped for requests with API authentication, which are made by clients
-  # that don't support CSRF tokens. All browser-based actions still require CSRF protection.
-  skip_forgery_protection if: -> { SessionLoader.new(request).has_api_authentication? }
+  # CSRF is skipped only for API-authenticated requests (clients that don't support CSRF tokens).
+  #
+  # Header auth (Authorization: Basic/Bearer) is skipped unconditionally, because it cannot be used
+  # to forge a request in the victim's name:
+  #   - Bearer is structurally CSRF-immune: browsers never auto-attach it, and cross-site JS that
+  #     sets an Authorization header triggers a CORS preflight the attacker's origin can't satisfy.
+  #   - Basic CAN reach us cross-site (e.g. a navigation to https://user:pass@host/ still sends the
+  #     header in Chrome/Firefox — do NOT rely on browsers stripping it), but the credentials are
+  #     attacker-supplied, so the request runs as the attacker, not the victim. Basic would only
+  #     become victim-ambient if browsers had cached Basic credentials for this origin, which never
+  #     happens here: browser login is cookie-based and we never send a `WWW-Authenticate: Basic`
+  #     challenge, so browsers are never prompted to cache/auto-resend Basic for us.
+  #
+  # Param auth (login/api_key) IS forgeable: a hidden cross-site <form> can submit those fields.
+  # A browser always attaches a cross-origin Origin header to such a submission, so we additionally
+  # require the request to be same-origin (or origin-less, i.e. non-browser) before skipping.
+  skip_forgery_protection if: -> do
+    loader = SessionLoader.new(request)
+    loader.has_header_authentication? ||
+      (loader.has_login_param_authentication? && loader.same_origin_request?)
+  end
 
   before_action :reset_current_user
   before_action :sanitize_params
+  before_action :sanitize_cookies
   before_action :set_current_user
   around_action :set_time_zone
   before_action :validate_pagination_param_types
@@ -32,6 +50,13 @@ class ApplicationController < ActionController::Base
   # This is raised on requests to `/blah.js`. Rails has already rendered StaticController#not_found
   # here, so calling `rescue_exception` would cause a double render error.
   rescue_from ActionController::InvalidCrossOriginRequest, with: -> {}
+
+  # Raised when HTTP_CLIENT_IP and HTTP_X_FORWARDED_FOR disagree.
+  # Likely scanner probes. Not actionable - no need to send these to the exception log.
+  rescue_from ActionDispatch::RemoteIp::IpSpoofAttackError, with: -> {
+    Rails.logger.warn("IP spoof attempt: CLIENT_IP=#{request.env['HTTP_CLIENT_IP'].inspect} XFF=#{request.env['HTTP_X_FORWARDED_FOR'].inspect} UA=#{request.user_agent.inspect}")
+    head 400
+  }
 
   def check_valid_username
     return if params[:controller] == "user_name_change_requests"
@@ -63,8 +88,24 @@ class ApplicationController < ActionController::Base
     sanitize_hash.call(params)
   end
 
+  # The ParameterSanitizer middleware scrubs the raw, still-URL-encoded Cookie header,
+  # but Rails percent-decodes cookie values afterwards. Decoding can reintroduce invalid
+  # UTF-8 bytes or null bytes (e.g. `nmm=%FF`), which then blow up later when something
+  # calls a string operation such as `blank?`/`present?` on the value while rendering.
+  # This mirrors sanitize_params for the decoded cookie jar.
+  def sanitize_cookies
+    scrubbed = {}
+    cookies.each do |key, value|
+      next unless value.is_a?(String)
+      next if value.valid_encoding? && value.exclude?("\u0000")
+
+      scrubbed[key] = value.scrub("").delete("\u0000")
+    end
+    cookies.update(scrubbed) if scrubbed.any?
+  end
+
   def api_check
-    if !CurrentUser.is_anonymous? && !request.get? && !request.head?
+    if CurrentUser.user.is_logged_in? && !request.get? && !request.head?
       throttled = CurrentUser.user.token_bucket.throttled?
       headers["X-Api-Limit"] = CurrentUser.user.token_bucket.cached_count.to_s
 
@@ -89,6 +130,12 @@ class ApplicationController < ActionController::Base
       render_error_page(500, exception, message: "The database timed out running your query.")
     when ActionDispatch::Http::Parameters::ParseError, ActionController::BadRequest, PostVersion::UndoError
       render_error_page(400, exception)
+    when SessionLoader::InsufficientScope
+      response.set_header("WWW-Authenticate", %(Bearer error="insufficient_scope", scope="full"))
+      render_expected_error(401, "Insufficient scope")
+    when SessionLoader::LevelBelowMinimum
+      response.set_header("WWW-Authenticate", %(Bearer error="invalid_token", error_description="user level below application minimum"))
+      render_expected_error(401, "Account level below application minimum")
     when SessionLoader::AuthenticationFailure
       session.delete(:user_id)
       cookies.delete :remember
@@ -103,8 +150,12 @@ class ApplicationController < ActionController::Base
       render_unsupported_format
     when Danbooru::Paginator::PaginationError
       render_expected_error(410, exception.message)
-    when TagQuery::CountExceededError, TagQuery::DepthExceededError, TagQuery::InvalidTagError, ParseValue::InvalidDateError
+    when TagQuery::CountExceededError, TagQuery::DepthExceededError, TagQuery::InvalidTagError, ParseValue::InvalidDateError, PostSet::PostLimitError
       render_expected_error(422, exception.message)
+    when Regexp::TimeoutError
+      # See TagQuery.group_depth_exceeded?
+      # Show a cheap 422 for a malformed/abusive search that blows up a regex.
+      render_expected_error(422, "Your query was too complex to process. Try simplifying it.")
     when FeatureUnavailable
       render_expected_error(400, "This feature isn't available")
     when PG::ConnectionBad
@@ -155,7 +206,7 @@ class ApplicationController < ActionController::Base
     @backtrace = Rails.backtrace_cleaner.clean(@exception.backtrace)
     format = :html unless format.in?(%i[html json atom])
 
-    if !CurrentUser.user.is_janitor? && message == exception.message
+    if !CurrentUser.user.is_staff? && message == exception.message
       @message = "An unexpected error occurred."
     end
 
@@ -172,7 +223,7 @@ class ApplicationController < ActionController::Base
 
     respond_to do |fmt|
       fmt.html do
-        if CurrentUser.is_anonymous?
+        if CurrentUser.user.is_logged_out?
           if request.get?
             redirect_to new_session_path(url: previous_url), notice: @message
           else
@@ -203,13 +254,26 @@ class ApplicationController < ActionController::Base
     CurrentUser.user = nil
     CurrentUser.ip_addr = nil
     CurrentUser.safe_mode = Danbooru.config.safe_mode?
+    CurrentUser.oauth_token = nil
   end
 
   def requires_reauthentication
-    return redirect_to(new_session_path(url: request.fullpath)) if CurrentUser.user.is_anonymous?
+    return redirect_to(new_session_path(url: request.fullpath)) if CurrentUser.user.is_logged_out?
     last_authenticated_at = session[:last_authenticated_at]
     if last_authenticated_at.blank? || Time.zone.parse(last_authenticated_at) < 1.hour.ago
-      redirect_to(confirm_password_session_path(url: request.fullpath))
+      if request.get?
+        return_to = request.fullpath
+      else
+        # If the request is not a GET, we can't redirect back to it after reauthentication.
+        # Redirecting back to the referer is the next best option, although that would lose
+        # any form data and query params.
+        begin
+          return_to = URI.parse(request.referer.to_s).path.presence
+        rescue URI::InvalidURIError
+          return_to = nil
+        end
+      end
+      redirect_to(confirm_password_session_path(url: return_to))
     end
   end
 
@@ -219,7 +283,10 @@ class ApplicationController < ActionController::Base
     end
   end
 
-  User::Roles.each do |role|
+  # These method names are misleading.
+  # For example, `janitor_only` does not mean "only janitors can access this", it means "janitors and above can access this".
+  # This is a legacy naming convention that would require a large refactor to change, so we are stuck with it.
+  UserLevel::ROLES.each do |role|
     define_method("#{role}_only") do
       user_access_check("is_#{role}?")
     end
@@ -231,14 +298,26 @@ class ApplicationController < ActionController::Base
     end
   end
 
+  %i[approver].each do |role|
+    define_method("#{role}_only") do
+      user_access_check("is_#{role}?")
+    end
+  end
+
   def logged_in_only
-    if CurrentUser.is_anonymous?
+    if CurrentUser.user.is_logged_out? || IpBan.is_banned?(CurrentUser.ip_addr)
       access_denied("Must be logged in")
     end
   end
 
   def reject_api_key_auth
     if CurrentUser.api_key.present?
+      render_expected_error(:forbidden, "This action requires browser authentication")
+    end
+  end
+
+  def reject_bearer_auth
+    if CurrentUser.oauth_token.present?
       render_expected_error(:forbidden, "This action requires browser authentication")
     end
   end

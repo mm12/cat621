@@ -13,22 +13,35 @@ admin = User.find_or_create_by!(name: "admin") do |user|
   user.password_confirmation = "hexerade"
   user.password_hash = ""
   user.email = "admin@e621.local"
-  user.can_upload_free = true
   user.can_approve_posts = true
-  user.level = User::Levels::ADMIN
+  user.level = UserLevel::ADMIN
 
   user.is_bd_staff = true
   user.is_bd_auditor = true
 end
 
-User.find_or_create_by!(name: Danbooru.config.system_user) do |user|
+# The karma setter below writes an upload_karma_events row attributed to CurrentUser.
+CurrentUser.user = admin
+CurrentUser.ip_addr = "127.0.0.1"
+
+required_karma = User.required_karma_for_level(Danbooru.config.upload_karma_free_threshold)
+if !required_karma.nil? && admin.upload_karma < required_karma
+  admin.upload_karma = required_karma
+  admin.save!
+end
+
+system = User.find_or_create_by!(name: Danbooru.config.system_user) do |user|
   user.password = "ae3n4oie2n3oi4en23oie4noienaorshtaioresnt"
   user.password_confirmation = "ae3n4oie2n3oi4en23oie4noienaorshtaioresnt"
   user.password_hash = ""
   user.email = "system@e621.local"
-  user.can_upload_free = true
   user.can_approve_posts = true
-  user.level = User::Levels::JANITOR
+  user.level = UserLevel::JANITOR
+end
+
+if !required_karma.nil? && system.upload_karma < required_karma
+  system.upload_karma = required_karma
+  system.save!
 end
 
 ForumCategory.find_or_create_by!(name: "Tag Alias and Implication Suggestions") do |category|
@@ -133,11 +146,10 @@ end
 
 unless Rails.env.test?
   begin
-    CurrentUser.user = admin
-    CurrentUser.ip_addr = "127.0.0.1"
     import_mascots
     setup_upload_whitelist
     setup_report_reasons
+    setup_flag_reasons
   rescue Exception => e # rubocop:disable Lint/RescueException
     puts "--------"
     puts "#{e.class}: #{e.message}"

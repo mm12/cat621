@@ -1,12 +1,11 @@
 # frozen_string_literal: true
 
 class TransferFavoritesJob < ApplicationJob
-  queue_as :low_prio
-  sidekiq_options lock: :until_executing
+  sidekiq_options queue: "low_prio", lock: :until_executing, lock_ttl: 1.hour.to_i
 
-  def perform(*args)
-    @post = Post.find_by(id: args[0])
-    @user = User.find_by(id: args[1])
+  def perform(post_id, user_id)
+    @post = Post.find_by(id: post_id)
+    @user = User.find_by(id: user_id)
     return unless @post && @user
 
     CurrentUser.scoped(@user) do
@@ -96,18 +95,13 @@ class TransferFavoritesJob < ApplicationJob
     true
   end
 
-  # Update fav_string (rollback safety net) and fav_count for both child and parent posts.
+  # Recompute fav_count for both child and parent from the favorites table.
+  # The job reindexes both posts explicitly (step 6), so update_columns is enough.
   def update_post_favorites_data(child_post, parent_post, _removed_user_ids, added_user_ids)
-    child_post.write_fav_string!("", 0)
-    child_post.update_columns(updated_at: Time.current)
+    child_post.update_columns(fav_count: Favorite.where(post_id: child_post.id).count, updated_at: Time.current)
 
     if added_user_ids.any?
-      current_fav_parts = parent_post.fav_string.split
-      new_fav_parts = added_user_ids.map { |user_id| "fav:#{user_id}" }
-      all_fav_parts = (current_fav_parts + new_fav_parts).uniq
-
-      parent_post.write_fav_string!(all_fav_parts.join(" "), all_fav_parts.length)
-      parent_post.update_columns(updated_at: Time.current)
+      parent_post.update_columns(fav_count: Favorite.where(post_id: parent_post.id).count, updated_at: Time.current)
     end
   end
 

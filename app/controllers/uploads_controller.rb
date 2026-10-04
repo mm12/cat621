@@ -2,7 +2,7 @@
 
 class UploadsController < ApplicationController
   before_action :member_only
-  before_action :janitor_only, only: [:index, :show]
+  before_action :staff_only, only: [:index, :show]
   before_action :ensure_uploads_enabled, only: %i[new create]
   respond_to :html, :json
   content_security_policy only: [:new] do |p|
@@ -10,16 +10,9 @@ class UploadsController < ApplicationController
     p.media_src :self, :data, :blob, "*"
   end
 
-  def new
-    if CurrentUser.can_upload_with_reason == :REJ_UPLOAD_NEWBIE
-      return access_denied("You can not upload during your first week.")
-    end
-    @upload = Upload.new
-    respond_with(@upload)
-  end
-
   def index
     @uploads = Upload.search(search_params).includes(:post, :uploader).paginate(params[:page], :limit => params[:limit])
+    Post.preload_stats!(@uploads.map(&:post))
     respond_with(@uploads)
   end
 
@@ -32,6 +25,14 @@ class UploadsController < ApplicationController
         end
       end
     end
+  end
+
+  def new
+    if CurrentUser.can_upload_with_reason == :REJ_UPLOAD_NEWBIE
+      return access_denied("You can not upload during your first week.")
+    end
+    @upload = Upload.new
+    respond_with(@upload)
   end
 
   def create

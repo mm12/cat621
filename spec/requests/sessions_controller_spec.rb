@@ -24,12 +24,11 @@ RSpec.describe SessionsController do
 
   describe "POST /session" do
     before do
-      allow(RateLimiter).to receive(:check_limit).and_return(false)
-      allow(RateLimiter).to receive(:hit)
+      allow(RateLimiter).to receive(:new).and_return(instance_double(RateLimiter, throttled?: false, hit!: 1))
     end
 
     context "when rate limited" do
-      before { allow(RateLimiter).to receive(:check_limit).and_return(true) }
+      before { allow(RateLimiter).to receive(:new).and_return(instance_double(RateLimiter, throttled?: true)) }
 
       it "redirects to new_session_path with a notice (HTML)" do
         post session_path, params: { session: { name: member.name, password: "hexerade" } }
@@ -98,14 +97,23 @@ RSpec.describe SessionsController do
 
   describe "DELETE /session" do
     before do
-      allow(RateLimiter).to receive(:check_limit).and_return(false)
-      allow(RateLimiter).to receive(:hit)
+      allow(RateLimiter).to receive(:new).and_return(instance_double(RateLimiter, throttled?: false, hit!: 1))
       make_session(member)
     end
 
-    it "redirects to posts_path" do
-      delete session_path
+    it "redirects to referer when present" do
+      delete session_path, headers: { "Referer" => posts_path }
       expect(response).to redirect_to(posts_path)
+    end
+
+    it "redirects to root_path when no referer" do
+      delete session_path
+      expect(response).to redirect_to(root_path)
+    end
+
+    it "does not redirect to an external referer" do
+      delete session_path, headers: { "Referer" => "https://evil.example.com" }
+      expect(response).to redirect_to(root_path)
     end
 
     it "clears session[:user_id]" do

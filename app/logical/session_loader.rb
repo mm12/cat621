@@ -2,6 +2,8 @@
 
 class SessionLoader
   class AuthenticationFailure < StandardError; end
+  class InsufficientScope < AuthenticationFailure; end
+  class LevelBelowMinimum < AuthenticationFailure; end
 
   attr_reader :session, :cookies, :request, :params
 
@@ -21,7 +23,9 @@ class SessionLoader
     CurrentUser.user = User.anonymous
     CurrentUser.ip_addr = request.remote_ip
 
-    if has_api_authentication?
+    if oauth_bearer_auth?
+      load_session_for_bearer
+    elsif has_api_authentication?
       load_session_for_api
     elsif session[:user_id]
       load_session_user
@@ -29,8 +33,11 @@ class SessionLoader
       load_remember_token
     end
 
+    # Record the IP for everyone, including attempted logins from banned users.
+    UserIpTracker.track!(CurrentUser.user, CurrentUser.ip_addr)
+
     CurrentUser.user.unban! if CurrentUser.user.ban_expired?
-    if CurrentUser.user.is_blocked?
+    if CurrentUser.user.is_restricted?
       recent_ban = CurrentUser.user.recent_ban
       if recent_ban.nil? || recent_ban.prevent_login?
         ban_message = "Account is banned: forever"
@@ -48,7 +55,47 @@ class SessionLoader
   end
 
   def has_api_authentication?
-    request.authorization.present? || (params[:login].present? && params[:api_key].present?)
+    has_header_authentication? || has_login_param_authentication?
+  end
+
+  # Authentication carried in a request header (Authorization: Basic/Bearer). A cross-site
+  # attacker cannot forge this: HTML forms can't set request headers, and a cross-origin
+  # fetch() that sets Authorization triggers a CORS preflight the attacker's origin can't
+  # satisfy. Header auth is therefore inherently immune to the CSRF forgery vector.
+  def has_header_authentication?
+    oauth_bearer_auth? || has_basic_authorization?
+  end
+
+  # Authentication carried in request params (login + api_key). This IS forgeable: a hidden
+  # cross-site <form> can submit these fields, so it must be paired with a same-origin check.
+  def has_login_param_authentication?
+    params[:login].present? && params[:api_key].present?
+  end
+
+  # A forged cross-site form submission always carries an Origin header pointing at the attacker's
+  # page, whereas non-browser API clients (curl, bots) send none. Mirror Rails' own same-origin
+  # comparison so CSRF is only skipped for genuine first-party or non-browser requests.
+  #
+  # NOTE: an opaque-origin browser context (file://, sandboxed iframe, data: URL) sends the
+  # literal header `Origin: null`, which arrives as the string "null" — not nil — so it is
+  # correctly treated as NOT same-origin here.
+  def same_origin_request?
+    request.origin.nil? || request.origin == request.base_url
+  end
+
+  def has_bearer_token?
+    bearer_token.present?
+  end
+
+  def oauth_bearer_auth?
+    Danbooru.config.enable_oauth_provider? && has_bearer_token?
+  end
+
+  def bearer_token
+    return @bearer_token if defined?(@bearer_token)
+
+    auth = request.authorization.to_s
+    @bearer_token = auth.start_with?("Bearer ") ? auth.split(" ", 2).last : nil
   end
 
   def has_remember_token?
@@ -56,6 +103,34 @@ class SessionLoader
   end
 
   private
+
+  def has_basic_authorization?
+    request.authorization.to_s.start_with?("Basic ")
+  end
+
+  def load_session_for_bearer
+    token = Doorkeeper::AccessToken.by_token(bearer_token)
+    raise AuthenticationFailure unless token&.accessible?
+
+    unless token.scopes.exists?("full")
+      raise InsufficientScope
+    end
+
+    user = User.find_by(id: token.resource_owner_id)
+    raise AuthenticationFailure if user.nil?
+
+    min_level = token.application&.minimum_user_level.to_i
+    if min_level > 0 && user.level < min_level
+      raise LevelBelowMinimum
+    end
+
+    # Doorkeeper::OAuth::Token.authenticate normally triggers this; bearer path bypasses it.
+    token.revoke_previous_refresh_token! if Doorkeeper.config.refresh_token_enabled?
+
+    CurrentUser.user = user
+    CurrentUser.api_key = nil
+    CurrentUser.oauth_token = token
+  end
 
   def load_remember_token
     begin
@@ -69,13 +144,15 @@ class SessionLoader
       CurrentUser.user = user
       session[:user_id] = user.id
       session[:ph] = user.password_token # This has been validated by the remember token
+      # Mirrors SessionCreator so OIDC auth_time reflects this restore.
+      user.update_columns(last_logged_in_at: Time.now) unless user.is_restricted?
     rescue
       return
     end
   end
 
   def refresh_old_remember_token
-    if cookies.encrypted[:remember] && !CurrentUser.is_anonymous?
+    if cookies.encrypted[:remember] && !CurrentUser.user.is_logged_out?
       cookies.encrypted[:remember] = {value: @remember_validator.generate("#{CurrentUser.id}:#{CurrentUser.password_token}", purpose: "rbr", expires_in: 14.days), expires: Time.now + 14.days, httponly: true, same_site: :lax, secure: Rails.env.production?}
     end
   end
@@ -143,10 +220,12 @@ class SessionLoader
   end
 
   def update_user_login_tracking
-    return if CurrentUser.is_anonymous?
+    return if CurrentUser.user.is_logged_out?
 
     cache_key = if CurrentUser.api_key
                   "user_login_tracking:api_key:#{CurrentUser.api_key.id}"
+                elsif CurrentUser.oauth_token
+                  "user_login_tracking:oauth_token:#{CurrentUser.oauth_token.id}"
                 else
                   "user_login_tracking:user:#{CurrentUser.id}"
                 end
@@ -154,7 +233,9 @@ class SessionLoader
 
     Cache.redis.setex(cache_key, 60, "1")
 
-    if CurrentUser.last_logged_in_at.nil? || CurrentUser.last_logged_in_at <= 1.day.ago
+    # last_logged_in_at feeds the OIDC auth_time claim; bearer use must not bump it.
+    if CurrentUser.oauth_token.nil? &&
+       (CurrentUser.last_logged_in_at.nil? || CurrentUser.last_logged_in_at <= 1.day.ago)
       CurrentUser.user.update_attribute(:last_logged_in_at, Time.now)
     end
 
@@ -163,6 +244,7 @@ class SessionLoader
     end
 
     CurrentUser.api_key&.update_usage!(@request.remote_ip, @request.user_agent)
+    CurrentUser.oauth_token&.update!(last_used_at: Time.current)
   end
 
   def set_safe_mode
@@ -179,7 +261,7 @@ class SessionLoader
   # This should normally happen when the user reads their last unread dmail.
   def refresh_unread_dmails
     return if skip_cookies?
-    return if CurrentUser.is_anonymous?
+    return if CurrentUser.user.is_logged_out?
     return if cookies[:hide_dmail_notice].blank?
 
     if !CurrentUser.user.has_mail? && cookies[:hide_dmail_notice] == "1"

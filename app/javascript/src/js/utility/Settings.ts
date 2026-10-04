@@ -3,7 +3,8 @@ const _get = function () {
   if (loaded) return _data;
   try {
     const base64 = document.getElementById("site-settings").textContent;
-    const json = atob(base64);
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const json = new TextDecoder().decode(bytes);
     _data = JSON.parse(json);
     loaded = true;
     return _data;
@@ -31,8 +32,18 @@ const Settings = {} as {
       search_trend: boolean,
     }
   },
+  Autocomplete: {
+    blacklist: RegExp[],
+  },
+  Iqdb: {
+    enabled: boolean,
+  },
   Posts: {
     webp_enabled: boolean,
+    max_file_size: number,
+    max_file_sizes: Record<string, number>,
+    video_extensions: string[],
+    default_bg_color: string,
   },
 };
 
@@ -53,12 +64,52 @@ Object.defineProperty(Settings, "Analytics", {
   },
 });
 
+Object.defineProperty(Settings, "Autocomplete", {
+  configurable: true,
+  get () {
+    const obj = _get()["Autocomplete"] || {};
+
+    const blacklistRegexes: RegExp[] = [];
+    for (const pattern of (obj.blacklist as string[] || [])) {
+      try {
+        blacklistRegexes.push(new RegExp(pattern, "i"));
+      } catch (e) {
+        console.error(`Invalid regex pattern in Autocomplete.blacklist: ${pattern}`, e);
+      }
+    }
+
+    const value = {
+      blacklist: blacklistRegexes,
+    };
+    Object.defineProperty(Settings, "Autocomplete", { value, writable: false });
+    return value;
+  },
+});
+
+Object.defineProperty(Settings, "Iqdb", {
+  configurable: true,
+  get () {
+    const obj = _get()["Iqdb"] || {};
+    const value = {
+      enabled: obj.enabled || false,
+    };
+    Object.defineProperty(Settings, "Iqdb", { value, writable: false });
+    return value;
+  },
+});
+
 Object.defineProperty(Settings, "Posts", {
   configurable: true,
   get () {
     const obj = _get()["Posts"] || {};
     const value = {
       webp_enabled: obj.webp_enabled || false,
+      max_file_size: obj.max_file_size || 0,
+      max_file_sizes: obj.max_file_sizes || {},
+      // Degrade to the known set rather than treating every video URL as an image.
+      video_extensions: obj.video_extensions || ["webm", "mp4"],
+      // Bare hex, no "#" — same format Danbooru.config.default_bg_color uses.
+      default_bg_color: obj.default_bg_color || "152f56",
     };
     Object.defineProperty(Settings, "Posts", { value, writable: false });
     return value;

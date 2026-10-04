@@ -6,24 +6,27 @@ class BansController < ApplicationController
   respond_to :json, only: %i[index show]
   helper_method :search_params
 
+  def index
+    @bans = Ban.search(search_params).paginate(params[:page], :limit => params[:limit])
+    respond_with(@bans) do |format|
+      format.html { @bans = @bans.includes(:user, :banner) }
+      format.json { render json: BanBlueprint.render(@bans) }
+    end
+  end
+
+  def show
+    @ban = Ban.find(params[:id])
+    respond_with(@ban) do |format|
+      format.json { render json: BanBlueprint.render(@ban) }
+    end
+  end
+
   def new
     @ban = Ban.new(ban_params(:create))
   end
 
   def edit
     @ban = Ban.find(params[:id])
-  end
-
-  def index
-    @bans = Ban.search(search_params).paginate(params[:page], :limit => params[:limit])
-    respond_with(@bans) do |format|
-      format.html { @bans = @bans.includes(:user, :banner) }
-    end
-  end
-
-  def show
-    @ban = Ban.find(params[:id])
-    respond_with(@ban)
   end
 
   def create
@@ -47,14 +50,15 @@ class BansController < ApplicationController
 
   def destroy
     @ban = Ban.find(params[:id])
+    @user = @ban.user
     @ban.destroy
-    redirect_to bans_path, :notice => "Ban destroyed"
+    redirect_to user_path(@user), :notice => "Ban destroyed"
   end
 
   private
 
   def ban_params(context)
-    permitted_params = %i[reason duration expires_at is_permaban prevent_login]
+    permitted_params = %i[reason duration expires_at prevent_login]
     permitted_params += %i[user_id user_name] if context == :create
 
     params.fetch(:ban, {}).permit(permitted_params)

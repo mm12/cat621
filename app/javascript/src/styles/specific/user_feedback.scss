@@ -14,7 +14,7 @@
   color: palette("text-yellow");
 }
 
-div#c-user-feedbacks, div#c-moderator-dashboards .activity-container {
+div#c-user-feedbacks, div#c-staff-moderator-dashboards .activity-container {
   .feedback-category-positive {
     background: palette("background-green");
   }
@@ -40,5 +40,12 @@ div#c-user-feedbacks, div#c-moderator-dashboards .activity-container {
     width: 100%;
     text-align: center;
     padding: 0.5em 0;
+  }
+}
+
+div#c-user-feedbacks #a-index {
+  .user-feedback-expired {
+    margin-top: 0.5rem;
+    font-weight: bold;
   }
 }

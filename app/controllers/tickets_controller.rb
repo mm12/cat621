@@ -3,7 +3,7 @@
 class TicketsController < ApplicationController
   respond_to :html, :json, except: %i[create new]
   before_action :member_only, except: %i[index]
-  before_action :janitor_only, only: %i[update claim unclaim]
+  before_action :staff_only, only: %i[update claim unclaim]
 
   def index
     @tickets = Ticket
@@ -73,6 +73,9 @@ class TicketsController < ApplicationController
     if @ticket.valid?
       not_changed = ticket_params[:send_update_dmail].to_s.truthy? && (!@ticket.saved_change_to_response? && !@ticket.saved_change_to_status?)
       flash[:notice] = "Not sending update, no changes" if not_changed
+    else
+      flash[:notice] = "Error: #{@ticket.errors.full_messages.join(', ')}"
+      return redirect_to(ticket_path(@ticket))
     end
 
     respond_with(@ticket)

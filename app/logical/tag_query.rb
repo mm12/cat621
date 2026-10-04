@@ -82,7 +82,7 @@ class TagQuery
     commenter comm noter noteupdater flagreason flagnote flaggedby
   ].concat(CATEGORY_METATAG_MAP.keys).freeze
 
-  METATAGS = %w[md5 order limit child randseed hot_from ratinglocked notelocked statuslocked].concat(
+  METATAGS = %w[md5 order limit child randseed ratinglocked notelocked statuslocked].concat(
     NEGATABLE_METATAGS, COUNT_METATAGS, BOOLEAN_METATAGS
   ).freeze
 
@@ -216,7 +216,7 @@ class TagQuery
   # Therefore, these are pulled out of groups and placed on the top level of searches.
   #
   # Note that this includes all valid prefixes.
-  GLOBAL_METATAGS = %w[order -order limit randseed hot_from].freeze
+  GLOBAL_METATAGS = %w[order -order limit randseed].freeze
 
   # The values for the `status` metatag that will override the automatic hiding of deleted posts
   # from search results. Other tags do also alter this behavior; specifically, a `deletedby` or
@@ -232,7 +232,9 @@ class TagQuery
     status -status
     delreason -delreason ~delreason
     deletedby -deletedby ~deletedby
+    deleter -deleter ~deleter
     flaggedby -flaggedby ~flaggedby
+    flagger -flagger ~flagger
     flagnote -flagnote ~flagnote
     flagreason -flagreason ~flagreason
   ].freeze
@@ -595,6 +597,35 @@ class TagQuery
     end
   end
 
+  # Cheap, linear guard against catastrophic backtracking in `REGEX_TOKENIZE`, whose recursive
+  # group subpattern blows up on deeply-nested group parentheses (especially unbalanced ones like
+  # `( ( ( ( a ) )`) before `Regexp.timeout` aborts the match. The `DEPTH_LIMIT` recursion guards
+  # run too late — the blowup is inside a single regex match.
+  #
+  # Walks the string once, tracking net group nesting depth, and returns `true` once it passes
+  # `DEPTH_LIMIT` so callers can reject the query before running the regex. Only genuine group
+  # delimiters count (see `REGEX_GROUP_DELIMITER`): a `(` embedded in a tag (`:(`, `foo(`) is
+  # ignored, and quoted metatags are stripped first since the tokenizer matches those atomically.
+  # A group opener (whitespace-delimited `(`, optional `-`/`~` prefix, followed by whitespace —
+  # matching the tokenizer's `\(\s+`) or a group closer (`)` preceded by whitespace).
+  REGEX_GROUP_DELIMITER = /(?<=\s|\A)[-~]?\((?=\s)|(?<=\s)\)(?=\s|\z)/
+
+  def self.group_depth_exceeded?(tag_str)
+    str = tag_str.to_s
+    # Reaching depth `DEPTH_LIMIT + 1` needs at least that many `(` + whitespace pairs.
+    return false if str.length < (DEPTH_LIMIT + 1) * 2
+    str = str.gsub(TagQuery::REGEX_ANY_QUOTED_METATAG, "") if str.include?(':"')
+    depth = 0
+    str.scan(REGEX_GROUP_DELIMITER) do |delimiter|
+      if delimiter.end_with?("(")
+        return true if (depth += 1) > DEPTH_LIMIT
+      elsif depth > 0
+        depth -= 1
+      end
+    end
+    false
+  end
+
   # Iterates through tokens, returning each tokens' `MatchData` in accordance with
   # `TagQuery::REGEX_TOKENIZE`.
   # ### Parameters
@@ -619,6 +650,13 @@ class TagQuery
       return []
     end
     tag_str = tag_str.to_s.unicode_normalize(:nfc).strip
+    # Reject pathologically-nested group parentheses before they reach `REGEX_TOKENIZE`, where
+    # they'd cause catastrophic backtracking. Only checked at the top level; sub-strings passed to
+    # recursive calls are already one level shallower.
+    if depth == 0 && TagQuery.group_depth_exceeded?(tag_str)
+      raise DepthExceededError if kwargs[:error_on_depth_exceeded]
+      return []
+    end
     results = []
     # OPTIMIZE: Candidate for early exit
     # return results if tag_str.blank?
@@ -685,6 +723,12 @@ class TagQuery
     return [] if tag_str.blank? || /\A[-~]?\(\s+\)\z/.match?(tag_str)
     # Quick and dirty optimization: If it can't contain any groups, use a simpler tokenizer.
     return TagQuery.send(kwargs[:segregate_metatags] ? :scan_light : :scan, tag_str, **kwargs) unless REGEX_HAS_GROUP.match?(tag_str)
+    # Reject pathologically-nested group parentheses before they reach `REGEX_TOKENIZE` below,
+    # where they'd cause catastrophic backtracking. Only checked at the top level; recursive calls
+    # receive sub-strings that are already one level shallower.
+    if depth == 0 && TagQuery.group_depth_exceeded?(tag_str)
+      return error_on_depth_exceeded ? (raise DepthExceededError) : []
+    end
     # If this query is composed of 1 top-level group with no modifiers, convert to ungrouped.
     # TODO: Check if regex catches nested groups & quoted metatag groups
     if SETTINGS[:EARLY_SCAN_SEARCH_CHECK] && tag_str.start_with?("(") && tag_str.end_with?(")")
@@ -1394,7 +1438,7 @@ class TagQuery
       when "fav", "-fav", "~fav", "favoritedby", "-favoritedby", "~favoritedby"
         add_to_query(type, :fav_ids) do
           if g2.downcase == "me"
-            favuser = CurrentUser.is_authenticated? ? CurrentUser.user : nil
+            favuser = CurrentUser.user.is_logged_in? ? CurrentUser.user : nil
           else
             favuser = User.find_by_name_or_id(g2) # rubocop:disable Rails/DynamicFindBy
           end
@@ -1447,8 +1491,6 @@ class TagQuery
       when "date", "-date", "~date" then add_to_query(type, :date, ParseValue.date_range(g2))
 
       when "age", "-age", "~age" then add_to_query(type, :age, ParseValue.invert_range(ParseValue.range(g2, :age)))
-
-      when "hot_from" then q[:hot_from] = ParseValue.date_from(g2)
 
       when "tagcount", "-tagcount", "~tagcount" then add_to_query(type, :post_tag_count, ParseValue.range(g2))
 
@@ -1555,8 +1597,11 @@ class TagQuery
 
   # Checks if a certain tag should be transformed into a metatag, and adds it accordingly if so.
   def intercept_metatag_alias(tag, type)
-    if FileMethods::FILE_TYPE.value?(tag)
-      add_to_query(type, :filetype, tag)
+    filetype = FileMethods::FILE_TYPE_ALIASES[tag]
+    filetype ||= tag if FileMethods::FILE_TYPE.value?(tag)
+
+    if filetype
+      add_to_query(type, :filetype, filetype)
       return true
     end
     nil
@@ -1681,7 +1726,7 @@ class TagQuery
 
   def user_id_or_invalid(val)
     if val.is_a?(String) && val.casecmp?("me")
-      return CurrentUser.is_authenticated? ? CurrentUser.id : -1
+      return CurrentUser.user.is_logged_in? ? CurrentUser.id : -1
     end
     User.name_or_id_to_id(val).presence || -1
   end
@@ -1690,7 +1735,7 @@ class TagQuery
     if CurrentUser.user.is_moderator?
       return CurrentUser.id if val.is_a?(String) && val.casecmp?("me")
       User.name_or_id_to_id(val).presence
-    elsif CurrentUser.user.is_authenticated?
+    elsif CurrentUser.user.is_logged_in?
       CurrentUser.id.presence
     end || -1
   end

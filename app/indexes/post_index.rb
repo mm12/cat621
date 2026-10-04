@@ -1,6 +1,12 @@
 # frozen_string_literal: true
 
 module PostIndex
+  class ImportError < StandardError; end
+
+  # Offset `change_seq` past any old internal OpenSearch version so the first
+  # external write always wins without a reindex.
+  INDEX_VERSION_OFFSET = 2_000_000_000
+
   def self.included(base)
     base.document_store.index = {
       settings: {
@@ -24,6 +30,7 @@ module PostIndex
           up_score: { type: "integer" },
           down_score: { type: "integer" },
           score: { type: "integer" },
+          hotness: { type: "double" },
           fav_count: { type: "integer" },
           tag_count: { type: "integer" },
           change_seq: { type: "long" },
@@ -102,7 +109,9 @@ module PostIndex
         [pid, array[1..-2].split(",")]
       end
 
-      relation.find_in_batches do |batch|
+      failures = []
+
+      relation.find_in_batches(batch_size: batch_size) do |batch|
         post_ids = batch.map(&:id).join(",")
 
         comments_sql = <<-SQL
@@ -171,6 +180,11 @@ module PostIndex
         verified_artists_sql = <<-SQL.squish
           SELECT name, linked_user_id FROM artists WHERE linked_user_id IS NOT NULL
         SQL
+        fav_count_sql = <<-SQL
+          SELECT post_id, count(*) FROM favorites
+          WHERE post_id IN (#{post_ids})
+          GROUP BY post_id
+        SQL
 
         # Run queries
         conn = ApplicationRecord.connection
@@ -196,6 +210,7 @@ module PostIndex
         notes            = Hash.new { |h, k| h[k] = [] }
         conn.execute(note_sql).values.each { |p, b| notes[p] << b }
         pending_replacements = conn.execute(pending_replacements_sql).values.to_h
+        fav_counts = conn.execute(fav_count_sql).values.to_h
 
         # Special handling for votes to do it with one query
         vote_ids = conn.execute(votes_sql).values.map do |pid, uids, scores|
@@ -226,25 +241,48 @@ module PostIndex
             flagger:                  flagger_ids[p.id]    || empty,
             flag_reason:              flag_reasons[p.id]   || empty,
             flag_note:                flag_notes[p.id]     || empty,
+            fav_count:                fav_counts[p.id]     || 0,
             flagged_at:               flag_dates[p.id],
             has_pending_replacements: pending_replacements[p.id],
             artverified:              p.tag_array.any? { |tag| verified_artists.key?(tag) && verified_artists[tag] == p.uploader_id },
           }
 
-          {
-            index: {
-              _id:  p.id,
-              data: p.as_indexed_json(index_options),
-            },
-          }
+          meta = { _id: p.id, data: p.as_indexed_json(index_options) }
+          if (version = p.index_version)
+            meta[:version] = version
+            meta[:version_type] = "external_gte"
+          end
+
+          { index: meta }
         end
 
-        client.bulk({
+        response = client.bulk({
           index: index_name,
           body:  batch,
         })
+
+        next unless response["errors"]
+
+        # A 409 means a newer document already won. Collect anything else and keep
+        # going, so one bad document can't cost every later batch, then fail loudly.
+        failures.concat(response["items"].filter_map do |item|
+          result = item["index"]
+          next if result["error"].nil? || result["status"] == 409
+
+          "#{result['_id']}: #{result['error']['type']} (#{result['error']['reason']})"
+        end)
       end
+
+      raise ImportError, "Failed to index #{failures.size} post(s): #{failures.first(5).join('; ')}" if failures.any?
     end
+  end
+
+  def index_version
+    # All parallel test workers share one `posts_test` index while keeping separate databases,
+    # so their post ids and change_seqs collide with no ordering between them.
+    return nil if Rails.env.test?
+
+    change_seq + INDEX_VERSION_OFFSET
   end
 
   def as_indexed_json(options = {})
@@ -265,7 +303,8 @@ module PostIndex
       up_score:                 up_score,
       down_score:               down_score,
       score:                    score,
-      fav_count:                fav_count,
+      hotness:                  hotness,
+      fav_count:                options.key?(:fav_count) ? options[:fav_count] : fav_count,
       tag_count:                tag_count,
       change_seq:               change_seq,
 

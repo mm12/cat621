@@ -21,7 +21,14 @@ module RequestHelpers
       CurrentUser.user    = user
       CurrentUser.ip_addr = "127.0.0.1"
     end
-    allow(loader).to receive(:has_api_authentication?).and_return(false)
+    # The skip_forgery_protection condition in ApplicationController evaluates these per
+    # request; the SessionLoader double must respond to each of them.
+    allow(loader).to receive_messages(
+      has_api_authentication?: false,
+      has_header_authentication?: false,
+      has_login_param_authentication?: false,
+      same_origin_request?: true,
+    )
 
     # rubocop:disable RSpec/AnyInstance -- no way to reference the controller
     # instance before the request is dispatched in integration specs
@@ -29,14 +36,14 @@ module RequestHelpers
     # rubocop:enable RSpec/AnyInstance
   end
 
-  def make_session(user = nil, password = "hexerade", remember: true)
+  def make_session(user = nil, password = "hexerade", remember: true, url: nil)
     user = create(:user, password: password) if user.blank?
     unless user.is_a?(String)
       ret = user
       password = user.password.presence || password
       user = user.name
     end
-    post session_path(session: { name: user, password: password, remember: remember })
+    post session_path(session: { name: user, password: password, remember: remember, url: url }.compact)
     expect(response).to have_http_status(:found)
     ret || user
   end

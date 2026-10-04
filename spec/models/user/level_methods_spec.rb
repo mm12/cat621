@@ -9,21 +9,12 @@ require "rails_helper"
 RSpec.describe User do
   describe "level methods" do
     # -------------------------------------------------------------------------
-    # .level_hash
-    # -------------------------------------------------------------------------
-    describe ".level_hash" do
-      it "returns the levels hash from config" do
-        expect(User.level_hash).to eq(Danbooru.config.levels)
-      end
-    end
-
-    # -------------------------------------------------------------------------
     # .level_string
     # -------------------------------------------------------------------------
     describe ".level_string" do
       it "returns the level name for a known value" do
-        expect(User.level_string(User::Levels::MEMBER)).to eq("Member")
-        expect(User.level_string(User::Levels::ADMIN)).to eq("Admin")
+        expect(User.level_string(UserLevel::MEMBER)).to eq("Member")
+        expect(User.level_string(UserLevel::ADMIN)).to eq("Admin")
       end
 
       it "returns an empty string for an unknown value" do
@@ -38,7 +29,7 @@ RSpec.describe User do
       subject(:anon) { User.anonymous }
 
       it "has the anonymous level" do
-        expect(anon.level).to eq(User::Levels::ANONYMOUS)
+        expect(anon.level).to eq(UserLevel::ANONYMOUS)
       end
 
       it "is named Anonymous" do
@@ -58,9 +49,37 @@ RSpec.describe User do
     # .system
     # -------------------------------------------------------------------------
     describe ".system" do
+      before do
+        allow(Danbooru.config.custom_configuration).to receive_messages(system_user: "System", system_user_id: nil)
+        create(:user, name: "System", level: UserLevel::MODERATOR)
+        RequestStore[:system_user] = nil
+      end
+
+      after do
+        RequestStore[:system_user] = nil
+      end
+
       it "returns the system user" do
         system_user = User.find_by!(name: Danbooru.config.system_user)
+        expect(User.system.id).to eq(system_user.id)
+      end
+
+      it "returns the system user if ID is set" do
+        system_user = User.find_by!(name: Danbooru.config.system_user)
+        allow(Danbooru.config.custom_configuration).to receive(:system_user_id).and_return(system_user.id)
         expect(User.system).to eq(system_user)
+      end
+
+      it "raises an error if the system user does not exist" do
+        allow(Danbooru.config.custom_configuration).to receive(:system_user).and_return("Nonexistent")
+        expect { User.system }.to raise_error(ActiveRecord::RecordNotFound)
+      end
+
+      it "returns the system user if the ID is set but the name is changed" do
+        system_user = User.find_by!(name: Danbooru.config.system_user)
+        allow(Danbooru.config.custom_configuration).to receive(:system_user_id).and_return(system_user.id)
+        system_user.update!(name: "NewName")
+        expect(User.system.id).to eq(system_user.id)
       end
     end
 
@@ -69,13 +88,13 @@ RSpec.describe User do
     # -------------------------------------------------------------------------
     describe "#level_string" do
       it "returns the level name for the user's current level" do
-        user = build(:user, level: User::Levels::MEMBER)
+        user = build(:user, level: UserLevel::MEMBER)
         expect(user.level_string).to eq("Member")
       end
 
       it "returns the level name for a given value, ignoring the user's level" do
-        user = build(:user, level: User::Levels::MEMBER)
-        expect(user.level_string(User::Levels::ADMIN)).to eq("Admin")
+        user = build(:user, level: UserLevel::MEMBER)
+        expect(user.level_string(UserLevel::ADMIN)).to eq("Admin")
       end
     end
 
@@ -84,45 +103,69 @@ RSpec.describe User do
     # -------------------------------------------------------------------------
     describe "#level_string_was" do
       it "returns the previous level name after a level change" do
-        user = create(:user, level: User::Levels::MEMBER)
-        user.level = User::Levels::JANITOR
+        user = create(:user, level: UserLevel::MEMBER)
+        user.level = UserLevel::JANITOR
         expect(user.level_string_was).to eq("Member")
       end
     end
 
     # -------------------------------------------------------------------------
-    # #is_anonymous?
+    # #is_logged_in?
     # -------------------------------------------------------------------------
-    describe "#is_anonymous?" do
-      it "returns true for an anonymous user" do
-        expect(User.anonymous.is_anonymous?).to be(true)
+    describe "#is_logged_in?" do
+      it "returns false for an anonymous user" do
+        expect(User.anonymous.is_logged_in?).to be(false)
       end
 
-      it "returns false for a regular member" do
+      it "returns true for a regular member" do
         user = build(:user)
-        expect(user.is_anonymous?).to be(false)
+        expect(user.is_logged_in?).to be(true)
+      end
+
+      it "returns true for a blocked user" do
+        user = build(:user, level: UserLevel::BLOCKED)
+        expect(user.is_logged_in?).to be(true)
+      end
+
+      it "returns true for a staff member" do
+        user = build(:admin_user)
+        expect(user.is_logged_in?).to be(true)
       end
     end
 
     # -------------------------------------------------------------------------
-    # #is_blocked?
+    # #is_logged_out?
     # -------------------------------------------------------------------------
-    describe "#is_blocked?" do
-      it "returns true for a hard-banned user" do
-        user = build(:user, level: User::Levels::BLOCKED)
-        build(:ban, user: user, prevent_login: true)
-        expect(user.is_blocked?).to be(true)
-      end
-
-      it "returns true for a soft-banned user" do
-        user = build(:user, level: User::Levels::BLOCKED)
-        build(:ban, user: user, prevent_login: false)
-        expect(user.is_blocked?).to be(true)
+    describe "#is_logged_out?" do
+      it "returns true for an anonymous user" do
+        expect(User.anonymous.is_logged_out?).to be(true)
       end
 
       it "returns false for a regular member" do
         user = build(:user)
-        expect(user.is_blocked?).to be(false)
+        expect(user.is_logged_out?).to be(false)
+      end
+    end
+
+    # -------------------------------------------------------------------------
+    # #is_restricted?
+    # -------------------------------------------------------------------------
+    describe "#is_restricted?" do
+      it "returns true for a hard-banned user" do
+        user = build(:user, level: UserLevel::BLOCKED)
+        build(:ban, user: user, prevent_login: true)
+        expect(user.is_restricted?).to be(true)
+      end
+
+      it "returns true for a soft-banned user" do
+        user = build(:user, level: UserLevel::BLOCKED)
+        build(:ban, user: user, prevent_login: false)
+        expect(user.is_restricted?).to be(true)
+      end
+
+      it "returns false for a regular member" do
+        user = build(:user)
+        expect(user.is_restricted?).to be(false)
       end
     end
 
@@ -135,6 +178,7 @@ RSpec.describe User do
         expect(user.is_admin?).to be(true)
         expect(user.is_moderator?).to be(true)
         expect(user.is_janitor?).to be(true)
+        expect(user.is_staff?).to be(true)
         expect(user.is_member?).to be(true)
       end
 
@@ -143,6 +187,7 @@ RSpec.describe User do
         expect(user.is_admin?).to be(false)
         expect(user.is_moderator?).to be(false)
         expect(user.is_janitor?).to be(false)
+        expect(user.is_staff?).to be(false)
       end
 
       it "returns false for an unpersisted user" do
@@ -152,18 +197,29 @@ RSpec.describe User do
       end
     end
 
-    # -------------------------------------------------------------------------
-    # #is_staff?
-    # -------------------------------------------------------------------------
-    describe "#is_staff?" do
-      it "returns true for a janitor" do
-        user = create(:janitor_user)
+    describe "dynamic is_<level>? methods with TOTP requirement" do
+      before do
+        allow(Danbooru.config.custom_configuration).to receive(:require_totp_for_staff?).and_return(true)
+      end
+
+      it "returns true for a member without TOTP" do
+        user = create(:user)
+        expect(user.is_member?).to be(true)
+      end
+
+      it "returns false for a staff member without TOTP" do
+        user = create(:staff_user, totp_enabled: false)
+        expect(user.is_staff?).to be(false)
+      end
+
+      it "returns true for a staff member with TOTP" do
+        user = create(:staff_user, totp_enabled: true)
         expect(user.is_staff?).to be(true)
       end
 
-      it "returns false for a regular member" do
-        user = create(:user)
-        expect(user.is_staff?).to be(false)
+      it "returns true for the system user without TOTP" do
+        system_user = User.system
+        expect(system_user.is_staff?).to be(true)
       end
     end
 
@@ -187,12 +243,12 @@ RSpec.describe User do
     # -------------------------------------------------------------------------
     describe "#level_css_class" do
       it "returns the parameterized level name prefixed with 'user-'" do
-        expect(build(:user, level: User::Levels::MEMBER).level_css_class).to eq("user-member")
-        expect(build(:user, level: User::Levels::ADMIN).level_css_class).to eq("user-admin")
+        expect(build(:user, level: UserLevel::MEMBER).level_css_class).to eq("user-member")
+        expect(build(:user, level: UserLevel::ADMIN).level_css_class).to eq("user-admin")
       end
 
       it "hyphenates multi-word level names" do
-        expect(build(:user, level: User::Levels::FORMER_STAFF).level_css_class).to eq("user-former-staff")
+        expect(build(:user, level: UserLevel::FORMER_STAFF).level_css_class).to eq("user-former-staff")
       end
     end
   end

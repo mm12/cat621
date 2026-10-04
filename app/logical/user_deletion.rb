@@ -26,7 +26,7 @@ class UserDeletion
     clear_user_settings
     reset_password
     create_mod_action
-    FlushFavoritesJob.perform_later(user.id)
+    FlushFavoritesJob.perform_async(user.id)
   end
 
   private
@@ -58,9 +58,9 @@ class UserDeletion
       profile_about: "",
       profile_artinfo: "",
       custom_style: "",
-      level: User::Levels::MEMBER,
+      level: [user.level, UserLevel::MEMBER].min, # Keep banned users banned
     )
-    AvatarCleanupJob.perform_later(user.id, force: true)
+    AvatarCleanupJob.perform_async(user.id, true)
   end
 
   def reset_password
@@ -89,7 +89,7 @@ class UserDeletion
   end
 
   def validate
-    if user.is_blocked? && user.recent_ban&.prevent_login? && !admin_deletion
+    if user.is_restricted? && user.recent_ban&.prevent_login? && !admin_deletion
       raise ValidationError, "Banned users cannot delete their own accounts (request deletion at #{Danbooru.config.contact_email})"
     end
 
@@ -101,12 +101,12 @@ class UserDeletion
       raise ValidationError, "Password is incorrect"
     end
 
-    if user.level >= User::Levels::ADMIN
+    if user.level >= UserLevel::ADMIN
       raise ValidationError, "Admins cannot delete their account"
     end
 
     # Prevent deletion of staff accounts via admin deletion
-    if admin_deletion && user.level >= User::Levels::JANITOR
+    if admin_deletion && user.level >= UserLevel::JANITOR
       raise ValidationError, "Staff accounts cannot be deleted via admin deletion"
     end
   end

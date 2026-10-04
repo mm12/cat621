@@ -23,7 +23,9 @@ export default class Offclick {
 
         if (target.closest(entry.menuSelector).length > 0 // Click inside the menu
             || target.is(entry.buttonSelector) // Click the button itself
-            || target.parents(entry.buttonSelector).length > 0) // Click inside one of the button's children
+            || target.parents(entry.buttonSelector).length > 0 // Click inside one of the button's children
+            || target.closest("ul.ui-autocomplete-dropdown").length > 0 // Click inside an autocomplete dropdown
+        )
           continue;
 
         entry.callback();
@@ -53,31 +55,34 @@ export default class Offclick {
    * @returns {Object} An object with a `disabled` property that can be toggled to enable/disable the offclick handler.
    */
   static register (buttonSelector: string, menuSelector: string, callback: () => void): OffclickEntry {
-    const entry: OffclickEntry = {
-      buttonSelector: buttonSelector,
-      menuSelector: menuSelector,
-      callback: callback,
-      disabled: true, // Unused, but without it the linter complains
-      _disabled: true, // Actual storage for the disabled state
-    };
-
-    Object.defineProperty(entry, "disabled", {
-      get () { return this._disabled; },
-      set (value) {
-        this._disabled = value;
-        Offclick.instance.recalculateGlobalDisabled();
-      },
-    });
-
+    const entry = new OffclickEntry(buttonSelector, menuSelector, callback);
     this.instance.registry.push(entry);
     return entry;
   }
 }
 
-export interface OffclickEntry {
-  buttonSelector: string;
-  menuSelector: string;
-  callback: () => void;
-  disabled: boolean;
-  _disabled: boolean;
+export class OffclickEntry {
+
+  private _disabled = true;
+
+  constructor (
+    public readonly buttonSelector: string,
+    public readonly menuSelector: string,
+    public readonly callback: () => void,
+  ) {}
+
+  get disabled () {
+    return this._disabled;
+  }
+
+  set disabled (value: boolean) {
+    this._disabled = value;
+    Offclick.instance.recalculateGlobalDisabled();
+  }
+
+  public trigger () {
+    if (this.disabled) return;
+    this.callback();
+    this.disabled = true;
+  }
 }

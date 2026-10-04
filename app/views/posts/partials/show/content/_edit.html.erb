@@ -6,7 +6,7 @@
     <button type="button" class="st-button" id="post-edit-close"><%= svg_icon(:times) %><span>Cancel</span></button>
   </h3>
 
-  <% unless CurrentUser.user.is_janitor? %>
+  <% unless CurrentUser.user.is_staff? %>
     <div style="margin-bottom: 0.5rem;">
       <p>Before editing, read the <%= link_to "how to tag guide", wiki_page_path(id: "e621:tags") %>.</p>
     </div>
@@ -19,20 +19,20 @@
   <%= f.hidden_field :old_parent_id, value: post.parent_id %>
   <%= f.hidden_field :old_source, value: post.source %>
   <%= f.hidden_field :old_rating, value: post.rating %>
+  <%= f.hidden_field :old_description, value: post.description %>
 
   <div class="input" id="tags-container">
-    <div class="header">
-      <%= f.label :tag_string, "Tags" %>
-
-      <span class="options">
-        <%= svg_icon(:face_smile, id: "face", width: 16, height: 16) %>
-        <span class="count"></span>
-      </span>
+    <%# The header (label + tag counter) is rendered by the Vue editor. %>
+    <%# data-tags feeds the Vue editor its initial value %>
+    <%# newlines in the attribute survive HTML5 parsing, preserving the category grouping. %>
+    <div id="tag-string-editor" class="pending" data-tags="<%= post.presenter.categorized_tag_list_text %> ">
+      <label for="post_tag_string">Tags</label>
+      <textarea disabled>Loading...</textarea>
     </div>
 
-    <div id="tag-string-editor" class="pending">Loading...</div>
-
-    <%= f.input :locked_tags, label: "Locked Tags", autocomplete: "tag-edit", input_html: { value: post.locked_tags || "", spellcheck: false, size: "60x2", disabled: !CurrentUser.is_admin? } %>
+    <%# tag-query (not tag-edit) matches the uploader's Locked Tags field; being
+        server-rendered, this one is initialized by the global autocomplete pass. %>
+    <%= f.input :locked_tags, label: "Locked Tags", autocomplete: "tag-query", input_html: { value: post.locked_tags || "", spellcheck: false, size: "60x2", disabled: !CurrentUser.is_admin? } %>
   </div>
 
   <% if post.is_rating_locked? %>
@@ -60,7 +60,7 @@
       <%= f.label :blank, "Lock" %>
 
       <fieldset class="locks">
-        <% if CurrentUser.is_janitor? %>
+        <% if CurrentUser.is_staff? %>
           <%= f.input :is_note_locked, label: "Notes" %>
         <% end %>
         <%= f.input :is_rating_locked, label: "Rating" %>
@@ -74,7 +74,7 @@
     </div>
   <% end %>
 
-  <% if CurrentUser.is_janitor? %>
+  <% if CurrentUser.is_staff? %>
     <%= f.input :bg_color, label: "Background Color", input_html: { size: 10 } %>
   <% end %>
 

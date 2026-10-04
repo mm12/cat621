@@ -17,7 +17,7 @@ RSpec.describe PostIndex do
         category_count_keys = TagCategory::REVERSE_MAPPING.values.map { |name| :"tag_count_#{name}" }
         expected_keys = %i[
           created_at updated_at commented_at comment_bumped_at noted_at
-          id up_score down_score score fav_count tag_count change_seq
+          id up_score down_score score hotness fav_count tag_count change_seq
           comment_count file_size parent pools sets commenters noters
           faves upvotes downvotes children uploader approver deleter
           width height mpixels aspect_ratio duration
@@ -40,6 +40,7 @@ RSpec.describe PostIndex do
         expect(indexed[:up_score]).to eq(post.up_score)
         expect(indexed[:down_score]).to eq(post.down_score)
         expect(indexed[:score]).to eq(post.score)
+        expect(indexed[:hotness]).to eq(post.hotness)
         expect(indexed[:fav_count]).to eq(post.fav_count)
         expect(indexed[:file_size]).to eq(post.file_size)
         expect(indexed[:change_seq]).to eq(post.change_seq)
@@ -554,6 +555,67 @@ RSpec.describe PostIndex do
       it "unknown keys in options do not raise" do
         expect { post.as_indexed_json(unknown_key: "value") }.not_to raise_error
       end
+    end
+  end
+
+  describe "#index_version" do
+    let(:post) { create(:post) }
+
+    it "is nil in the test environment, where parallel workers share one index" do
+      expect(post.index_version).to be_nil
+    end
+
+    it "offsets change_seq past any plausible internal document version" do
+      allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
+      expect(post.index_version).to eq(post.change_seq + PostIndex::INDEX_VERSION_OFFSET)
+    end
+
+    it "advances when the post's tags change, so a later write outranks an earlier one" do
+      previous = post.change_seq
+      post.update!(tag_string: "#{post.tag_string} another_tag")
+      expect(post.reload.change_seq).to be > previous
+    end
+  end
+
+  describe ".import" do
+    let!(:post) { create(:post) }
+    let!(:other_post) { create(:post) }
+    let(:client) { instance_double(OpenSearch::Client) }
+
+    before { allow(Post.document_store).to receive(:client).and_return(client) }
+
+    def bulk_response(status, type)
+      {
+        "errors" => true,
+        "items"  => [{ "index" => { "_id" => post.id.to_s, "status" => status, "error" => { "type" => type, "reason" => "..." } } }],
+      }
+    end
+
+    it "raises when a document fails for any reason other than a version conflict" do
+      allow(client).to receive(:bulk).and_return(bulk_response(400, "mapper_parsing_exception"))
+
+      expect { Post.document_store.import(query: { id: post.id }) }
+        .to raise_error(PostIndex::ImportError, /mapper_parsing_exception/)
+    end
+
+    it "ignores version conflicts, which mean a newer document already won" do
+      allow(client).to receive(:bulk).and_return(bulk_response(409, "version_conflict_engine_exception"))
+
+      expect { Post.document_store.import(query: { id: post.id }) }.not_to raise_error
+    end
+
+    it "does not raise when every document is written" do
+      allow(client).to receive(:bulk).and_return({ "errors" => false, "items" => [] })
+
+      expect { Post.document_store.import(query: { id: post.id }) }.not_to raise_error
+    end
+
+    it "keeps importing later batches after one fails, then raises once" do
+      allow(client).to receive(:bulk).and_return(bulk_response(400, "mapper_parsing_exception"), { "errors" => false, "items" => [] })
+
+      expect { Post.document_store.import(query: { id: [post.id, other_post.id] }, batch_size: 1) }
+        .to raise_error(PostIndex::ImportError)
+      expect(client).to have_received(:bulk).twice
     end
   end
 end

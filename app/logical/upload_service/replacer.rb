@@ -50,12 +50,17 @@ class UploadService
         previous_md5 = post.md5
         previous_file_ext = post.file_ext
 
+        previous_pending = post.is_pending? # Drives the replacer's +1 credit
+        reverting = replacement.status.in?(%w[approved original]) # Drives revert logic
+
         post.md5 = upload.md5
         post.file_ext = upload.file_ext
         post.image_width = upload.image_width
         post.image_height = upload.image_height
         post.file_size = upload.file_size
-        post.duration = upload.video_duration(upload.file.path)
+        animated = upload.is_animated_file?(upload.file.path)
+        post.is_animated = animated
+        post.duration = upload.video_duration(upload.file.path, animated: animated)
         post.source = "#{replacement.source}\n" + post.source
         post.tag_string = upload.tag_string
         # Reset ownership information on post.
@@ -77,7 +82,26 @@ class UploadService
         UserStatus.for_user(previous_uploader).update_all("own_post_replaced_count = own_post_replaced_count + 1")
         if penalize_current_uploader.to_s.truthy?
           UserStatus.for_user(previous_uploader).update_all("own_post_replaced_penalize_count = own_post_replaced_penalize_count + 1")
+          # Karma penalty for the previous uploader, in step with the penalize counter.
+          UserStatus.adjust_karma(previous_uploader, -UserStatus::KARMA_REPLACEMENT_PENALTY, :replacement_penalty, post_id: post.id, data: { replacement_id: replacement.id })
         end
+
+        # The live post's approved credit follows ownership: previous owner loses it, new one gets it.
+        # Skipped when the post is still pending.
+        if replacement.creator_id != previous_uploader && !previous_pending
+          transfer_data = { replacement_id: replacement.id, from: previous_uploader, to: replacement.creator_id }
+          UserStatus.adjust_karma(previous_uploader, -UserStatus::KARMA_APPROVED_CREDIT, :replacement_transfer, post_id: post.id, data: transfer_data)
+          UserStatus.adjust_karma(replacement.creator_id, UserStatus::KARMA_APPROVED_CREDIT, :replacement_transfer, post_id: post.id, data: transfer_data)
+        end
+
+        # Reset-to must revert any penalty that the previous version carried.
+        if reverting
+          retiring = post.replacements.approved.find_by(md5: previous_md5)
+          retiring.toggle_penalize! if retiring&.penalize_uploader_on_approve? && retiring.id != replacement.id
+        end
+
+        # Invalidate avatar cache
+        User.where(avatar_id: post.id).pluck(:id).each { |uid| UserAvatarUrlCache.invalidate(uid) }
 
         # Everything went through correctly, the old files can now be removed
         if md5_changed

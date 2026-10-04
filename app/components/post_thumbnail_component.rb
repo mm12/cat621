@@ -6,6 +6,14 @@ class PostThumbnailComponent < ViewComponent::Base
 
   RIBBON_SIDE = %i[left right].freeze
 
+  # Preload favorite/vote status for the whole collection up front so rendering
+  # the thumbnails doesn't issue a query per post. Posts may be Draper-wrapped.
+  def self.with_collection(collection, **kwargs)
+    posts = Array.wrap(collection).map { |post| post.respond_to?(:object) ? post.object : post }
+    Post.preload_stats!(posts)
+    super
+  end
+
   def initialize(post:, post_counter: -1, **options)
     super()
 
@@ -39,7 +47,7 @@ class PostThumbnailComponent < ViewComponent::Base
   end
 
   def should_render_image?
-    !@post.is_deleted? || @user&.is_janitor? || @user&.can_approve_posts?
+    !@post.is_deleted? || @user&.is_staff? || @user&.can_approve_posts?
   end
 
   ##############################
@@ -65,7 +73,7 @@ class PostThumbnailComponent < ViewComponent::Base
     klass << "rating-explicit" if post.rating == "e"
     klass << "blacklistable" unless options[:no_blacklist]
     klass << "no-stats" unless should_show_stats?
-    klass << "shift-badge" if should_show_ribbon?(:left)
+    klass << "native" if options[:native]
     klass
   end
 
@@ -113,7 +121,7 @@ class PostThumbnailComponent < ViewComponent::Base
     @tooltip_text ||= begin
       tooltip = "Rating: #{@post.rating}\nID: #{@post.id}\nDate: #{@post.created_at}\nStatus: #{@post.status}\nScore: #{@post.score}"
 
-      if @user.present? && @user.is_janitor?
+      if @user.present? && @user.is_staff?
         tooltip += "\nUploader: #{@post.uploader_name}"
         if @post.is_flagged? || @post.is_deleted?
           flag = @post.flags.order(id: :desc).first
@@ -128,7 +136,11 @@ class PostThumbnailComponent < ViewComponent::Base
   end
 
   def preview_urls
-    @preview_urls ||= post.preview_file_url_pair
+    @preview_urls ||= if options[:show_samples]
+                        post.sample_url_pair
+                      else
+                        post.preview_file_url_pair
+                      end
   end
 
   def alt_text

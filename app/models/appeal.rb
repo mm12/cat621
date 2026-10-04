@@ -14,7 +14,7 @@ class Appeal < ApplicationRecord
   validates :reason, presence: true
   validates :reason, length: { minimum: 2, maximum: Danbooru.config.ticket_max_size }
   validates :response, length: { minimum: 2, maximum: Danbooru.config.dmail_max_size }, on: :update
-  enum :status, %i[pending partial approved rejected].index_with(&:to_s)
+  enum :status, %i[pending partial approved rejected].index_with(&:to_s), validate: true
   after_create :push_pubsub_create
   after_update :push_pubsub_update_notification
   after_update :log_update
@@ -59,6 +59,23 @@ class Appeal < ApplicationRecord
         return true if user.id == creator_id
         false
       end
+
+      def content_path
+        # For a post flag, send the user back to the post: either it's undeleted, it's been re-deleted
+        # (so they need to use the new flag's appeal button), or it's something they just can't appeal.
+        # Anyway it's more helpful for the user to see the current post status than the appeals index.
+        if content.present? && (post = content.post.presence)
+          return Rails.application.routes.url_helpers.post_path(post)
+        end
+        nil
+      end
+
+      def messages
+        {
+          duplicate: "This deletion has already been appealed.",
+          cannot_create: "This deletion can't be appealed or has already been resolved.",
+        }
+      end
     end
   end
 
@@ -84,7 +101,7 @@ class Appeal < ApplicationRecord
     end
 
     def validate_creator_is_not_limited
-      return if creator == User.system
+      return if creator.is_system?
 
       # Hourly limit
       hourly_allowed = creator.can_appeal_hourly_with_reason
@@ -140,7 +157,7 @@ class Appeal < ApplicationRecord
     end
 
     def visible(user)
-      if user.is_janitor?
+      if user.is_staff?
         all
       else
         for_creator(user.id)
@@ -206,7 +223,7 @@ class Appeal < ApplicationRecord
 
   def can_view?(user = CurrentUser.user)
     # Should not happen - individual ticket types override this method.
-    return true if user.is_janitor?
+    return true if user.is_staff?
     return true if user.id == creator_id
     false
   end
@@ -221,6 +238,18 @@ class Appeal < ApplicationRecord
 
   def find_duplicate_for(_user)
     nil
+  end
+
+  def content_path
+    nil
+  end
+
+  def messages
+    # Should not happen - individual ticket types override this method.
+    {
+      duplicate: "Already appealed",
+      cannot_create: "Cannot be appealed",
+    }
   end
 
   def can_create_for?(_user)
@@ -299,7 +328,7 @@ class Appeal < ApplicationRecord
 
   module NotificationMethods
     def create_dmail
-      return if creator == User.system
+      return if creator.is_system?
       should_send = saved_change_to_status? || (send_update_dmail.to_s.truthy? && saved_change_to_response?)
       return unless should_send
 

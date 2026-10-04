@@ -31,11 +31,31 @@ CREATE FUNCTION public.posts_trigger_change_seq() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-  IF NEW.tag_string != OLD.tag_string OR NEW.parent_id != OLD.parent_id OR NEW.source != OLD.source OR NEW.approver_id != OLD.approver_id OR NEW.rating != OLD.rating OR NEW.description != OLD.description OR NEW.md5 != OLD.md5 OR NEW.is_deleted != OLD.is_deleted OR NEW.is_pending != OLD.is_pending OR NEW.is_flagged != OLD.is_flagged OR NEW.is_rating_locked != OLD.is_rating_locked OR NEW.is_status_locked != OLD.is_status_locked OR NEW.is_note_locked != OLD.is_note_locked OR NEW.bit_flags != OLD.bit_flags OR NEW.has_active_children != OLD.has_active_children OR NEW.last_noted_at != OLD.last_noted_at
-  THEN
-     NEW.change_seq = nextval('public.posts_change_seq_seq');
-  END IF;
-  RETURN NEW;
+    IF NEW.source IS DISTINCT FROM OLD.source
+        OR NEW.md5 IS DISTINCT FROM OLD.md5
+        OR NEW.rating IS DISTINCT FROM OLD.rating
+        OR NEW.is_note_locked IS DISTINCT FROM OLD.is_note_locked
+        OR NEW.is_rating_locked IS DISTINCT FROM OLD.is_rating_locked
+        OR NEW.is_status_locked IS DISTINCT FROM OLD.is_status_locked
+        OR NEW.is_pending IS DISTINCT FROM OLD.is_pending
+        OR NEW.is_flagged IS DISTINCT FROM OLD.is_flagged
+        OR NEW.is_deleted IS DISTINCT FROM OLD.is_deleted
+        OR NEW.uploader_id IS DISTINCT FROM OLD.uploader_id
+        OR NEW.approver_id IS DISTINCT FROM OLD.approver_id
+        OR NEW.parent_id IS DISTINCT FROM OLD.parent_id
+        OR NEW.tag_string IS DISTINCT FROM OLD.tag_string
+        OR NEW.locked_tags IS DISTINCT FROM OLD.locked_tags
+        OR NEW.description IS DISTINCT FROM OLD.description
+        OR NEW.bg_color IS DISTINCT FROM OLD.bg_color
+        OR NEW.last_noted_at IS DISTINCT FROM OLD.last_noted_at
+        OR NEW.has_active_children IS DISTINCT FROM OLD.has_active_children
+        OR NEW.bit_flags IS DISTINCT FROM OLD.bit_flags
+        OR NEW.video_samples IS DISTINCT FROM OLD.video_samples
+        OR NEW.pool_ids IS DISTINCT FROM OLD.pool_ids
+    THEN
+        NEW.change_seq = nextval('public.posts_change_seq_seq');
+    END IF;
+    RETURN NEW;
 END;
 $$;
 
@@ -249,6 +269,39 @@ ALTER SEQUENCE public.artists_id_seq OWNED BY public.artists.id;
 
 
 --
+-- Name: asn_ranges; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.asn_ranges (
+    id bigint NOT NULL,
+    first_ip inet NOT NULL,
+    last_ip inet NOT NULL,
+    asn bigint NOT NULL,
+    name character varying NOT NULL,
+    country character varying DEFAULT ''::character varying NOT NULL
+);
+
+
+--
+-- Name: asn_ranges_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.asn_ranges_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: asn_ranges_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.asn_ranges_id_seq OWNED BY public.asn_ranges.id;
+
+
+--
 -- Name: automod_rules; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -398,7 +451,7 @@ ALTER SEQUENCE public.bans_id_seq OWNED BY public.bans.id;
 --
 
 CREATE TABLE public.blips (
-    id bigint NOT NULL,
+    id integer NOT NULL,
     creator_ip_addr inet NOT NULL,
     creator_id integer NOT NULL,
     body character varying NOT NULL,
@@ -475,7 +528,7 @@ ALTER SEQUENCE public.bulk_update_requests_id_seq OWNED BY public.bulk_update_re
 --
 
 CREATE TABLE public.comment_votes (
-    id integer NOT NULL,
+    id bigint NOT NULL,
     comment_id integer NOT NULL,
     user_id integer NOT NULL,
     score integer NOT NULL,
@@ -490,7 +543,6 @@ CREATE TABLE public.comment_votes (
 --
 
 CREATE SEQUENCE public.comment_votes_id_seq
-    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -546,6 +598,39 @@ CREATE SEQUENCE public.comments_id_seq
 --
 
 ALTER SEQUENCE public.comments_id_seq OWNED BY public.comments.id;
+
+
+--
+-- Name: db_exports; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.db_exports (
+    id bigint NOT NULL,
+    name character varying NOT NULL,
+    file_size bigint DEFAULT 0 NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    checksum character varying
+);
+
+
+--
+-- Name: db_exports_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.db_exports_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: db_exports_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.db_exports_id_seq OWNED BY public.db_exports.id;
 
 
 --
@@ -626,7 +711,7 @@ ALTER SEQUENCE public.dmail_filters_id_seq OWNED BY public.dmail_filters.id;
 --
 
 CREATE TABLE public.dmails (
-    id integer NOT NULL,
+    id bigint NOT NULL,
     owner_id integer NOT NULL,
     from_id integer NOT NULL,
     to_id integer NOT NULL,
@@ -735,7 +820,7 @@ ALTER SEQUENCE public.email_blacklists_id_seq OWNED BY public.email_blacklists.i
 --
 
 CREATE TABLE public.exception_logs (
-    id bigint NOT NULL,
+    id integer NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     class_name character varying NOT NULL,
@@ -804,7 +889,7 @@ ALTER SEQUENCE public.favorites_id_seq OWNED BY public.favorites.id;
 --
 
 CREATE TABLE public.forum_categories (
-    id bigint NOT NULL,
+    id integer NOT NULL,
     name character varying NOT NULL,
     description text,
     cat_order integer,
@@ -1017,7 +1102,7 @@ ALTER SEQUENCE public.forum_topics_id_seq OWNED BY public.forum_topics.id;
 --
 
 CREATE TABLE public.help_pages (
-    id bigint NOT NULL,
+    id integer NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     name character varying NOT NULL,
@@ -1239,7 +1324,8 @@ CREATE TABLE public.notes (
     body text NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    version integer DEFAULT 0 NOT NULL
+    version integer DEFAULT 0 NOT NULL,
+    creator_ip_addr inet NOT NULL
 );
 
 
@@ -1261,6 +1347,155 @@ CREATE SEQUENCE public.notes_id_seq
 --
 
 ALTER SEQUENCE public.notes_id_seq OWNED BY public.notes.id;
+
+
+--
+-- Name: oauth_access_grants; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.oauth_access_grants (
+    id bigint NOT NULL,
+    resource_owner_id bigint NOT NULL,
+    application_id bigint NOT NULL,
+    token character varying NOT NULL,
+    expires_in integer NOT NULL,
+    redirect_uri text NOT NULL,
+    scopes character varying DEFAULT ''::character varying NOT NULL,
+    revoked_at timestamp(6) without time zone,
+    code_challenge character varying,
+    code_challenge_method character varying,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: oauth_access_grants_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.oauth_access_grants_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: oauth_access_grants_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.oauth_access_grants_id_seq OWNED BY public.oauth_access_grants.id;
+
+
+--
+-- Name: oauth_access_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.oauth_access_tokens (
+    id bigint NOT NULL,
+    resource_owner_id bigint,
+    application_id bigint NOT NULL,
+    token character varying NOT NULL,
+    refresh_token character varying,
+    expires_in integer,
+    scopes character varying,
+    revoked_at timestamp(6) without time zone,
+    previous_refresh_token character varying DEFAULT ''::character varying NOT NULL,
+    last_used_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: oauth_access_tokens_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.oauth_access_tokens_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: oauth_access_tokens_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.oauth_access_tokens_id_seq OWNED BY public.oauth_access_tokens.id;
+
+
+--
+-- Name: oauth_applications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.oauth_applications (
+    id bigint NOT NULL,
+    name character varying NOT NULL,
+    uid character varying NOT NULL,
+    secret character varying NOT NULL,
+    redirect_uri text NOT NULL,
+    scopes character varying DEFAULT ''::character varying NOT NULL,
+    confidential boolean DEFAULT true NOT NULL,
+    owner_type character varying,
+    owner_id bigint,
+    description text,
+    homepage_url character varying,
+    minimum_user_level integer DEFAULT 0 NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: oauth_applications_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.oauth_applications_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: oauth_applications_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.oauth_applications_id_seq OWNED BY public.oauth_applications.id;
+
+
+--
+-- Name: oauth_openid_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.oauth_openid_requests (
+    id bigint NOT NULL,
+    access_grant_id bigint NOT NULL,
+    nonce character varying NOT NULL
+);
+
+
+--
+-- Name: oauth_openid_requests_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.oauth_openid_requests_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: oauth_openid_requests_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.oauth_openid_requests_id_seq OWNED BY public.oauth_openid_requests.id;
 
 
 --
@@ -1548,7 +1783,9 @@ CREATE TABLE public.post_replacements2 (
     reason character varying NOT NULL,
     protected boolean DEFAULT false NOT NULL,
     uploader_id_on_approve integer,
-    penalize_uploader_on_approve boolean
+    penalize_uploader_on_approve boolean,
+    sequence_number integer NOT NULL,
+    CONSTRAINT post_replacements2_status_original_seq0 CHECK ((((status)::text = 'original'::text) = (sequence_number = 0)))
 );
 
 
@@ -1576,7 +1813,7 @@ ALTER SEQUENCE public.post_replacements2_id_seq OWNED BY public.post_replacement
 --
 
 CREATE TABLE public.post_report_reasons (
-    id bigint NOT NULL,
+    id integer NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     reason character varying NOT NULL,
@@ -1610,7 +1847,7 @@ ALTER SEQUENCE public.post_report_reasons_id_seq OWNED BY public.post_report_rea
 --
 
 CREATE TABLE public.post_set_maintainers (
-    id bigint NOT NULL,
+    id integer NOT NULL,
     post_set_id integer NOT NULL,
     user_id integer NOT NULL,
     status character varying DEFAULT 'pending'::character varying NOT NULL,
@@ -1643,7 +1880,7 @@ ALTER SEQUENCE public.post_set_maintainers_id_seq OWNED BY public.post_set_maint
 --
 
 CREATE TABLE public.post_sets (
-    id bigint NOT NULL,
+    id integer NOT NULL,
     name character varying NOT NULL,
     shortname character varying NOT NULL,
     description text DEFAULT ''::text NOT NULL,
@@ -1731,7 +1968,7 @@ ALTER SEQUENCE public.post_versions_id_seq OWNED BY public.post_versions.id;
 --
 
 CREATE TABLE public.post_votes (
-    id integer NOT NULL,
+    id bigint NOT NULL,
     post_id integer NOT NULL,
     user_id integer NOT NULL,
     score integer NOT NULL,
@@ -1746,7 +1983,6 @@ CREATE TABLE public.post_votes (
 --
 
 CREATE SEQUENCE public.post_votes_id_seq
-    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -1784,7 +2020,6 @@ CREATE TABLE public.posts (
     uploader_id integer NOT NULL,
     uploader_ip_addr inet NOT NULL,
     approver_id integer,
-    fav_string text DEFAULT ''::text NOT NULL,
     pool_string text DEFAULT ''::text NOT NULL,
     last_noted_at timestamp without time zone,
     last_comment_bumped_at timestamp without time zone,
@@ -1817,7 +2052,9 @@ CREATE TABLE public.posts (
     is_comment_disabled boolean DEFAULT false NOT NULL,
     is_comment_locked boolean DEFAULT false NOT NULL,
     tag_count_contributor integer DEFAULT 0 NOT NULL,
-    video_samples jsonb DEFAULT '{}'::jsonb NOT NULL
+    video_samples jsonb DEFAULT '{}'::jsonb NOT NULL,
+    hotness double precision DEFAULT 0.0 NOT NULL,
+    pool_ids integer[] DEFAULT '{}'::integer[]
 );
 
 
@@ -2035,6 +2272,44 @@ ALTER SEQUENCE public.staff_audit_logs_id_seq OWNED BY public.staff_audit_logs.i
 
 
 --
+-- Name: staff_files; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.staff_files (
+    id bigint NOT NULL,
+    creator_id integer NOT NULL,
+    storage_id character varying NOT NULL,
+    md5 character varying NOT NULL,
+    file_ext character varying NOT NULL,
+    file_size integer NOT NULL,
+    original_filename character varying NOT NULL,
+    title character varying,
+    description text,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: staff_files_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.staff_files_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: staff_files_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.staff_files_id_seq OWNED BY public.staff_files.id;
+
+
+--
 -- Name: staff_notes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2067,6 +2342,110 @@ CREATE SEQUENCE public.staff_notes_id_seq
 --
 
 ALTER SEQUENCE public.staff_notes_id_seq OWNED BY public.staff_notes.id;
+
+
+--
+-- Name: staff_wiki_refs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.staff_wiki_refs (
+    id bigint NOT NULL,
+    staff_wiki_id integer NOT NULL,
+    related_id integer NOT NULL,
+    related_type character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: staff_wiki_refs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.staff_wiki_refs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: staff_wiki_refs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.staff_wiki_refs_id_seq OWNED BY public.staff_wiki_refs.id;
+
+
+--
+-- Name: staff_wiki_versions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.staff_wiki_versions (
+    id bigint NOT NULL,
+    staff_wiki_id integer NOT NULL,
+    updater_id integer NOT NULL,
+    claimant_id integer,
+    updater_ip_addr inet NOT NULL,
+    title character varying NOT NULL,
+    body text DEFAULT ''::text NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: staff_wiki_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.staff_wiki_versions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: staff_wiki_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.staff_wiki_versions_id_seq OWNED BY public.staff_wiki_versions.id;
+
+
+--
+-- Name: staff_wikis; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.staff_wikis (
+    id bigint NOT NULL,
+    creator_id integer NOT NULL,
+    updater_id integer NOT NULL,
+    claimant_id integer,
+    title character varying NOT NULL,
+    body text DEFAULT ''::text NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: staff_wikis_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.staff_wikis_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: staff_wikis_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.staff_wikis_id_seq OWNED BY public.staff_wikis.id;
 
 
 --
@@ -2190,7 +2569,7 @@ ALTER SEQUENCE public.tag_rel_undos_id_seq OWNED BY public.tag_rel_undos.id;
 --
 
 CREATE TABLE public.tag_type_versions (
-    id bigint NOT NULL,
+    id integer NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     old_type integer NOT NULL,
@@ -2262,7 +2641,7 @@ ALTER SEQUENCE public.tags_id_seq OWNED BY public.tags.id;
 --
 
 CREATE TABLE public.takedowns (
-    id bigint NOT NULL,
+    id integer NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     creator_id integer,
@@ -2306,7 +2685,7 @@ ALTER SEQUENCE public.takedowns_id_seq OWNED BY public.takedowns.id;
 --
 
 CREATE TABLE public.tickets (
-    id bigint NOT NULL,
+    id integer NOT NULL,
     creator_id integer NOT NULL,
     creator_ip_addr inet NOT NULL,
     disp_id integer NOT NULL,
@@ -2343,11 +2722,47 @@ ALTER SEQUENCE public.tickets_id_seq OWNED BY public.tickets.id;
 
 
 --
+-- Name: upload_karma_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.upload_karma_events (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    creator_id bigint NOT NULL,
+    post_id bigint,
+    reason integer NOT NULL,
+    delta integer NOT NULL,
+    balance integer NOT NULL,
+    extra_data jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: upload_karma_events_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.upload_karma_events_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: upload_karma_events_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.upload_karma_events_id_seq OWNED BY public.upload_karma_events.id;
+
+
+--
 -- Name: upload_whitelists; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.upload_whitelists (
-    id bigint NOT NULL,
+    id integer NOT NULL,
     note character varying,
     reason character varying,
     allowed boolean DEFAULT true NOT NULL,
@@ -2383,7 +2798,7 @@ ALTER SEQUENCE public.upload_whitelists_id_seq OWNED BY public.upload_whitelists
 --
 
 CREATE TABLE public.uploads (
-    id integer NOT NULL,
+    id bigint NOT NULL,
     source text,
     rating character(1) NOT NULL,
     uploader_id integer NOT NULL,
@@ -2464,6 +2879,44 @@ ALTER SEQUENCE public.user_feedback_id_seq OWNED BY public.user_feedback.id;
 
 
 --
+-- Name: user_ip_addresses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_ip_addresses (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    ip_addr inet NOT NULL,
+    subnet inet GENERATED ALWAYS AS (
+CASE
+    WHEN (family(ip_addr) = 4) THEN network(set_masklen(ip_addr, 24))
+    ELSE network(set_masklen(ip_addr, 64))
+END) STORED NOT NULL,
+    first_seen_at timestamp(6) without time zone NOT NULL,
+    last_seen_at timestamp(6) without time zone NOT NULL,
+    hit_count integer DEFAULT 1 NOT NULL
+);
+
+
+--
+-- Name: user_ip_addresses_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.user_ip_addresses_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: user_ip_addresses_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.user_ip_addresses_id_seq OWNED BY public.user_ip_addresses.id;
+
+
+--
 -- Name: user_name_change_requests; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2539,7 +2992,7 @@ ALTER SEQUENCE public.user_password_reset_nonces_id_seq OWNED BY public.user_pas
 --
 
 CREATE TABLE public.user_statuses (
-    id bigint NOT NULL,
+    id integer NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     user_id integer NOT NULL,
@@ -2560,7 +3013,8 @@ CREATE TABLE public.user_statuses (
     own_post_replaced_penalize_count integer DEFAULT 0,
     post_replacement_rejected_count integer DEFAULT 0,
     ticket_count integer DEFAULT 0 NOT NULL,
-    appeal_count integer DEFAULT 0 NOT NULL
+    appeal_count integer DEFAULT 0 NOT NULL,
+    upload_karma integer DEFAULT 0 NOT NULL
 );
 
 
@@ -2581,6 +3035,40 @@ CREATE SEQUENCE public.user_statuses_id_seq
 --
 
 ALTER SEQUENCE public.user_statuses_id_seq OWNED BY public.user_statuses.id;
+
+
+--
+-- Name: user_totps; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_totps (
+    id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    secret_ciphertext text NOT NULL,
+    backup_code_digests text[] DEFAULT '{}'::text[] NOT NULL,
+    last_used_step bigint,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
+-- Name: user_totps_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.user_totps_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: user_totps_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.user_totps_id_seq OWNED BY public.user_totps.id;
 
 
 --
@@ -2658,7 +3146,8 @@ CREATE TABLE public.wiki_page_versions (
     other_names text[] DEFAULT '{}'::text[] NOT NULL,
     is_deleted boolean DEFAULT false NOT NULL,
     reason character varying,
-    parent character varying
+    parent character varying,
+    featured_posts integer[] DEFAULT '{}'::integer[] NOT NULL
 );
 
 
@@ -2697,7 +3186,8 @@ CREATE TABLE public.wiki_pages (
     updater_id integer,
     other_names text[] DEFAULT '{}'::text[] NOT NULL,
     is_deleted boolean DEFAULT false NOT NULL,
-    parent character varying
+    parent character varying,
+    featured_posts integer[] DEFAULT '{}'::integer[] NOT NULL
 );
 
 
@@ -2757,6 +3247,13 @@ ALTER TABLE ONLY public.artists ALTER COLUMN id SET DEFAULT nextval('public.arti
 
 
 --
+-- Name: asn_ranges id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.asn_ranges ALTER COLUMN id SET DEFAULT nextval('public.asn_ranges_id_seq'::regclass);
+
+
+--
 -- Name: automod_rules id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -2810,6 +3307,13 @@ ALTER TABLE ONLY public.comment_votes ALTER COLUMN id SET DEFAULT nextval('publi
 --
 
 ALTER TABLE ONLY public.comments ALTER COLUMN id SET DEFAULT nextval('public.comments_id_seq'::regclass);
+
+
+--
+-- Name: db_exports id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.db_exports ALTER COLUMN id SET DEFAULT nextval('public.db_exports_id_seq'::regclass);
 
 
 --
@@ -2943,6 +3447,34 @@ ALTER TABLE ONLY public.note_versions ALTER COLUMN id SET DEFAULT nextval('publi
 --
 
 ALTER TABLE ONLY public.notes ALTER COLUMN id SET DEFAULT nextval('public.notes_id_seq'::regclass);
+
+
+--
+-- Name: oauth_access_grants id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_access_grants ALTER COLUMN id SET DEFAULT nextval('public.oauth_access_grants_id_seq'::regclass);
+
+
+--
+-- Name: oauth_access_tokens id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_access_tokens ALTER COLUMN id SET DEFAULT nextval('public.oauth_access_tokens_id_seq'::regclass);
+
+
+--
+-- Name: oauth_applications id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_applications ALTER COLUMN id SET DEFAULT nextval('public.oauth_applications_id_seq'::regclass);
+
+
+--
+-- Name: oauth_openid_requests id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_openid_requests ALTER COLUMN id SET DEFAULT nextval('public.oauth_openid_requests_id_seq'::regclass);
 
 
 --
@@ -3086,10 +3618,38 @@ ALTER TABLE ONLY public.staff_audit_logs ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
+-- Name: staff_files id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_files ALTER COLUMN id SET DEFAULT nextval('public.staff_files_id_seq'::regclass);
+
+
+--
 -- Name: staff_notes id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.staff_notes ALTER COLUMN id SET DEFAULT nextval('public.staff_notes_id_seq'::regclass);
+
+
+--
+-- Name: staff_wiki_refs id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_wiki_refs ALTER COLUMN id SET DEFAULT nextval('public.staff_wiki_refs_id_seq'::regclass);
+
+
+--
+-- Name: staff_wiki_versions id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_wiki_versions ALTER COLUMN id SET DEFAULT nextval('public.staff_wiki_versions_id_seq'::regclass);
+
+
+--
+-- Name: staff_wikis id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_wikis ALTER COLUMN id SET DEFAULT nextval('public.staff_wikis_id_seq'::regclass);
 
 
 --
@@ -3142,6 +3702,13 @@ ALTER TABLE ONLY public.tickets ALTER COLUMN id SET DEFAULT nextval('public.tick
 
 
 --
+-- Name: upload_karma_events id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.upload_karma_events ALTER COLUMN id SET DEFAULT nextval('public.upload_karma_events_id_seq'::regclass);
+
+
+--
 -- Name: upload_whitelists id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -3163,6 +3730,13 @@ ALTER TABLE ONLY public.user_feedback ALTER COLUMN id SET DEFAULT nextval('publi
 
 
 --
+-- Name: user_ip_addresses id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_ip_addresses ALTER COLUMN id SET DEFAULT nextval('public.user_ip_addresses_id_seq'::regclass);
+
+
+--
 -- Name: user_name_change_requests id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -3181,6 +3755,13 @@ ALTER TABLE ONLY public.user_password_reset_nonces ALTER COLUMN id SET DEFAULT n
 --
 
 ALTER TABLE ONLY public.user_statuses ALTER COLUMN id SET DEFAULT nextval('public.user_statuses_id_seq'::regclass);
+
+
+--
+-- Name: user_totps id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_totps ALTER COLUMN id SET DEFAULT nextval('public.user_totps_id_seq'::regclass);
 
 
 --
@@ -3253,6 +3834,14 @@ ALTER TABLE ONLY public.artists
 
 
 --
+-- Name: asn_ranges asn_ranges_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.asn_ranges
+    ADD CONSTRAINT asn_ranges_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: automod_rules automod_rules_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3314,6 +3903,14 @@ ALTER TABLE ONLY public.comment_votes
 
 ALTER TABLE ONLY public.comments
     ADD CONSTRAINT comments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: db_exports db_exports_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.db_exports
+    ADD CONSTRAINT db_exports_pkey PRIMARY KEY (id);
 
 
 --
@@ -3474,6 +4071,38 @@ ALTER TABLE ONLY public.note_versions
 
 ALTER TABLE ONLY public.notes
     ADD CONSTRAINT notes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: oauth_access_grants oauth_access_grants_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_access_grants
+    ADD CONSTRAINT oauth_access_grants_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: oauth_access_tokens oauth_access_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_access_tokens
+    ADD CONSTRAINT oauth_access_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: oauth_applications oauth_applications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_applications
+    ADD CONSTRAINT oauth_applications_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: oauth_openid_requests oauth_openid_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_openid_requests
+    ADD CONSTRAINT oauth_openid_requests_pkey PRIMARY KEY (id);
 
 
 --
@@ -3639,11 +4268,43 @@ ALTER TABLE ONLY public.staff_audit_logs
 
 
 --
+-- Name: staff_files staff_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_files
+    ADD CONSTRAINT staff_files_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: staff_notes staff_notes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.staff_notes
     ADD CONSTRAINT staff_notes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: staff_wiki_refs staff_wiki_refs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_wiki_refs
+    ADD CONSTRAINT staff_wiki_refs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: staff_wiki_versions staff_wiki_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_wiki_versions
+    ADD CONSTRAINT staff_wiki_versions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: staff_wikis staff_wikis_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_wikis
+    ADD CONSTRAINT staff_wikis_pkey PRIMARY KEY (id);
 
 
 --
@@ -3703,6 +4364,14 @@ ALTER TABLE ONLY public.tickets
 
 
 --
+-- Name: upload_karma_events upload_karma_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.upload_karma_events
+    ADD CONSTRAINT upload_karma_events_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: upload_whitelists upload_whitelists_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3727,6 +4396,14 @@ ALTER TABLE ONLY public.user_feedback
 
 
 --
+-- Name: user_ip_addresses user_ip_addresses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_ip_addresses
+    ADD CONSTRAINT user_ip_addresses_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: user_name_change_requests user_name_change_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3748,6 +4425,14 @@ ALTER TABLE ONLY public.user_password_reset_nonces
 
 ALTER TABLE ONLY public.user_statuses
     ADD CONSTRAINT user_statuses_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: user_totps user_totps_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_totps
+    ADD CONSTRAINT user_totps_pkey PRIMARY KEY (id);
 
 
 --
@@ -3922,6 +4607,13 @@ CREATE INDEX index_artists_on_other_names ON public.artists USING gin (other_nam
 
 
 --
+-- Name: index_asn_ranges_on_first_ip; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_asn_ranges_on_first_ip ON public.asn_ranges USING btree (first_ip);
+
+
+--
 -- Name: index_automod_rules_on_creator_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4069,6 +4761,13 @@ CREATE INDEX index_comments_on_creator_id ON public.comments USING btree (creato
 
 
 --
+-- Name: index_comments_on_creator_id_and_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_comments_on_creator_id_and_created_at ON public.comments USING btree (creator_id, created_at DESC);
+
+
+--
 -- Name: index_comments_on_creator_id_and_post_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4115,6 +4814,13 @@ CREATE INDEX index_comments_on_post_id ON public.comments USING btree (post_id);
 --
 
 CREATE INDEX index_comments_on_to_tsvector_english_body ON public.comments USING gin (to_tsvector('english'::regconfig, body));
+
+
+--
+-- Name: index_db_exports_on_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_db_exports_on_name ON public.db_exports USING btree (name);
 
 
 --
@@ -4227,6 +4933,13 @@ CREATE INDEX index_favorites_on_user_id ON public.favorites USING btree (user_id
 --
 
 CREATE INDEX index_favorites_on_user_id_and_created_at ON public.favorites USING btree (user_id, created_at);
+
+
+--
+-- Name: index_favorites_on_user_id_and_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_favorites_on_user_id_and_id ON public.favorites USING btree (user_id, id);
 
 
 --
@@ -4447,6 +5160,76 @@ CREATE INDEX index_notes_on_to_tsvector_english_body ON public.notes USING gin (
 
 
 --
+-- Name: index_oauth_access_grants_on_application_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_oauth_access_grants_on_application_id ON public.oauth_access_grants USING btree (application_id);
+
+
+--
+-- Name: index_oauth_access_grants_on_resource_owner_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_oauth_access_grants_on_resource_owner_id ON public.oauth_access_grants USING btree (resource_owner_id);
+
+
+--
+-- Name: index_oauth_access_grants_on_token; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_oauth_access_grants_on_token ON public.oauth_access_grants USING btree (token);
+
+
+--
+-- Name: index_oauth_access_tokens_on_application_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_oauth_access_tokens_on_application_id ON public.oauth_access_tokens USING btree (application_id);
+
+
+--
+-- Name: index_oauth_access_tokens_on_refresh_token; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_oauth_access_tokens_on_refresh_token ON public.oauth_access_tokens USING btree (refresh_token);
+
+
+--
+-- Name: index_oauth_access_tokens_on_resource_owner_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_oauth_access_tokens_on_resource_owner_id ON public.oauth_access_tokens USING btree (resource_owner_id);
+
+
+--
+-- Name: index_oauth_access_tokens_on_token; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_oauth_access_tokens_on_token ON public.oauth_access_tokens USING btree (token);
+
+
+--
+-- Name: index_oauth_applications_on_owner; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_oauth_applications_on_owner ON public.oauth_applications USING btree (owner_type, owner_id);
+
+
+--
+-- Name: index_oauth_applications_on_uid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_oauth_applications_on_uid ON public.oauth_applications USING btree (uid);
+
+
+--
+-- Name: index_oauth_openid_requests_on_access_grant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_oauth_openid_requests_on_access_grant_id ON public.oauth_openid_requests USING btree (access_grant_id);
+
+
+--
 -- Name: index_pool_versions_on_pool_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4608,6 +5391,13 @@ CREATE INDEX index_post_replacements2_on_post_id ON public.post_replacements2 US
 
 
 --
+-- Name: index_post_replacements2_on_post_id_and_sequence_number; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_post_replacements2_on_post_id_and_sequence_number ON public.post_replacements2 USING btree (post_id, sequence_number);
+
+
+--
 -- Name: index_post_sets_on_post_ids; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4734,6 +5524,13 @@ CREATE INDEX index_posts_on_parent_id ON public.posts USING btree (parent_id);
 
 
 --
+-- Name: index_posts_on_pool_ids; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_posts_on_pool_ids ON public.posts USING gin (pool_ids);
+
+
+--
 -- Name: index_posts_on_pool_string_tokens; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4847,6 +5644,27 @@ CREATE INDEX index_staff_audit_logs_on_user_id ON public.staff_audit_logs USING 
 
 
 --
+-- Name: index_staff_files_on_creator_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_staff_files_on_creator_id ON public.staff_files USING btree (creator_id);
+
+
+--
+-- Name: index_staff_files_on_md5; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_staff_files_on_md5 ON public.staff_files USING btree (md5);
+
+
+--
+-- Name: index_staff_files_on_storage_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_staff_files_on_storage_id ON public.staff_files USING btree (storage_id);
+
+
+--
 -- Name: index_staff_notes_on_creator_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4865,6 +5683,41 @@ CREATE INDEX index_staff_notes_on_updater_id ON public.staff_notes USING btree (
 --
 
 CREATE INDEX index_staff_notes_on_user_id ON public.staff_notes USING btree (user_id);
+
+
+--
+-- Name: index_staff_wiki_refs_on_related_id_and_related_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_staff_wiki_refs_on_related_id_and_related_type ON public.staff_wiki_refs USING btree (related_id, related_type);
+
+
+--
+-- Name: index_staff_wiki_refs_on_staff_wiki_and_related; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_staff_wiki_refs_on_staff_wiki_and_related ON public.staff_wiki_refs USING btree (staff_wiki_id, related_id, related_type);
+
+
+--
+-- Name: index_staff_wiki_versions_on_staff_wiki_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_staff_wiki_versions_on_staff_wiki_id ON public.staff_wiki_versions USING btree (staff_wiki_id);
+
+
+--
+-- Name: index_staff_wiki_versions_on_updater_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_staff_wiki_versions_on_updater_id ON public.staff_wiki_versions USING btree (updater_id);
+
+
+--
+-- Name: index_staff_wikis_on_lower_title; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_staff_wikis_on_lower_title ON public.staff_wikis USING btree (lower((title)::text));
 
 
 --
@@ -4980,6 +5833,27 @@ CREATE INDEX index_tags_on_name_trgm ON public.tags USING gin (name public.gin_t
 
 
 --
+-- Name: index_upload_karma_events_on_creator_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_upload_karma_events_on_creator_id ON public.upload_karma_events USING btree (creator_id);
+
+
+--
+-- Name: index_upload_karma_events_on_post_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_upload_karma_events_on_post_id ON public.upload_karma_events USING btree (post_id) WHERE (post_id IS NOT NULL);
+
+
+--
+-- Name: index_upload_karma_events_on_user_id_and_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_upload_karma_events_on_user_id_and_id ON public.upload_karma_events USING btree (user_id, id);
+
+
+--
 -- Name: index_uploads_on_source; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5043,6 +5917,41 @@ CREATE INDEX index_user_feedback_on_user_id ON public.user_feedback USING btree 
 
 
 --
+-- Name: index_user_ip_addresses_on_ip_addr_and_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_user_ip_addresses_on_ip_addr_and_user_id ON public.user_ip_addresses USING btree (ip_addr, user_id);
+
+
+--
+-- Name: index_user_ip_addresses_on_last_seen_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_user_ip_addresses_on_last_seen_at ON public.user_ip_addresses USING btree (last_seen_at);
+
+
+--
+-- Name: index_user_ip_addresses_on_subnet_and_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_user_ip_addresses_on_subnet_and_user_id ON public.user_ip_addresses USING btree (subnet, user_id);
+
+
+--
+-- Name: index_user_ip_addresses_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_user_ip_addresses_on_user_id ON public.user_ip_addresses USING btree (user_id);
+
+
+--
+-- Name: index_user_ip_addresses_on_user_id_and_ip_addr; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_user_ip_addresses_on_user_id_and_ip_addr ON public.user_ip_addresses USING btree (user_id, ip_addr);
+
+
+--
 -- Name: index_user_lower_email; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5068,6 +5977,13 @@ CREATE INDEX index_user_name_change_requests_on_user_id ON public.user_name_chan
 --
 
 CREATE UNIQUE INDEX index_user_statuses_on_user_id ON public.user_statuses USING btree (user_id);
+
+
+--
+-- Name: index_user_totps_on_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_user_totps_on_user_id ON public.user_totps USING btree (user_id);
 
 
 --
@@ -5265,6 +6181,30 @@ ALTER TABLE ONLY public.blips
 
 
 --
+-- Name: staff_wiki_refs fk_rails_2cd6b3a2eb; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_wiki_refs
+    ADD CONSTRAINT fk_rails_2cd6b3a2eb FOREIGN KEY (staff_wiki_id) REFERENCES public.staff_wikis(id) ON DELETE CASCADE;
+
+
+--
+-- Name: staff_wiki_versions fk_rails_317c9a4443; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_wiki_versions
+    ADD CONSTRAINT fk_rails_317c9a4443 FOREIGN KEY (claimant_id) REFERENCES public.users(id);
+
+
+--
+-- Name: oauth_access_grants fk_rails_330c32d8d9; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_access_grants
+    ADD CONSTRAINT fk_rails_330c32d8d9 FOREIGN KEY (resource_owner_id) REFERENCES public.users(id);
+
+
+--
 -- Name: appeals fk_rails_3f7cd477a6; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5289,11 +6229,27 @@ ALTER TABLE ONLY public.avoid_posting_versions
 
 
 --
+-- Name: staff_wiki_versions fk_rails_4dad911f81; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_wiki_versions
+    ADD CONSTRAINT fk_rails_4dad911f81 FOREIGN KEY (updater_id) REFERENCES public.users(id);
+
+
+--
 -- Name: appeals fk_rails_4ed6a7befb; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.appeals
     ADD CONSTRAINT fk_rails_4ed6a7befb FOREIGN KEY (creator_id) REFERENCES public.users(id);
+
+
+--
+-- Name: user_totps fk_rails_55471fbc5f; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_totps
+    ADD CONSTRAINT fk_rails_55471fbc5f FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --
@@ -5305,11 +6261,59 @@ ALTER TABLE ONLY public.appeals
 
 
 --
+-- Name: user_ip_addresses fk_rails_5ea8388355; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_ip_addresses
+    ADD CONSTRAINT fk_rails_5ea8388355 FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: oauth_access_tokens fk_rails_732cb83ab7; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_access_tokens
+    ADD CONSTRAINT fk_rails_732cb83ab7 FOREIGN KEY (application_id) REFERENCES public.oauth_applications(id);
+
+
+--
+-- Name: oauth_openid_requests fk_rails_77114b3b09; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_openid_requests
+    ADD CONSTRAINT fk_rails_77114b3b09 FOREIGN KEY (access_grant_id) REFERENCES public.oauth_access_grants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: staff_wikis fk_rails_7c286bc172; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_wikis
+    ADD CONSTRAINT fk_rails_7c286bc172 FOREIGN KEY (updater_id) REFERENCES public.users(id);
+
+
+--
+-- Name: staff_files fk_rails_804a297dc9; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_files
+    ADD CONSTRAINT fk_rails_804a297dc9 FOREIGN KEY (creator_id) REFERENCES public.users(id);
+
+
+--
 -- Name: user_feedback fk_rails_9329a36823; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_feedback
     ADD CONSTRAINT fk_rails_9329a36823 FOREIGN KEY (updater_id) REFERENCES public.users(id);
+
+
+--
+-- Name: staff_wikis fk_rails_949cd2810d; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_wikis
+    ADD CONSTRAINT fk_rails_949cd2810d FOREIGN KEY (creator_id) REFERENCES public.users(id);
 
 
 --
@@ -5345,6 +6349,14 @@ ALTER TABLE ONLY public.avoid_postings
 
 
 --
+-- Name: oauth_access_grants fk_rails_b4b53e07b8; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_access_grants
+    ADD CONSTRAINT fk_rails_b4b53e07b8 FOREIGN KEY (application_id) REFERENCES public.oauth_applications(id);
+
+
+--
 -- Name: staff_notes fk_rails_bab7e2d92a; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5377,6 +6389,22 @@ ALTER TABLE ONLY public.avoid_postings
 
 
 --
+-- Name: staff_wiki_versions fk_rails_ce7d15f8f4; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_wiki_versions
+    ADD CONSTRAINT fk_rails_ce7d15f8f4 FOREIGN KEY (staff_wiki_id) REFERENCES public.staff_wikis(id) ON DELETE CASCADE;
+
+
+--
+-- Name: staff_wikis fk_rails_d05de95362; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_wikis
+    ADD CONSTRAINT fk_rails_d05de95362 FOREIGN KEY (claimant_id) REFERENCES public.users(id);
+
+
+--
 -- Name: favorites fk_rails_d20e53bb68; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5401,12 +6429,44 @@ ALTER TABLE ONLY public.staff_notes
 
 
 --
+-- Name: oauth_access_tokens fk_rails_ee63f25419; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.oauth_access_tokens
+    ADD CONSTRAINT fk_rails_ee63f25419 FOREIGN KEY (resource_owner_id) REFERENCES public.users(id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260907205015'),
+('20260827214903'),
+('20260824220908'),
+('20260819154314'),
+('20260818231537'),
+('20260812223301'),
+('20260812223255'),
+('20260812223229'),
+('20260805155544'),
+('20260728160704'),
+('20260727195335'),
+('20260727191219'),
+('20260727160104'),
+('20260713192035'),
+('20260707182943'),
+('20260702120000'),
+('20260624213023'),
+('20260622142717'),
+('20260617120000'),
+('20260615155147'),
+('20260612160840'),
+('20260608170029'),
+('20260530165214'),
+('20260530162738'),
 ('20260526234030'),
 ('20260520175932'),
 ('20260519151649'),

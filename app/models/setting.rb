@@ -4,20 +4,21 @@ class Setting < RailsSettings::Base
   cache_prefix { "v1" }
 
   scope :lockdown do
-    field :uploads_disabled,    type: :boolean, default: false
-    field :pools_disabled,      type: :boolean, default: false
-    field :post_sets_disabled,  type: :boolean, default: false
-    field :comments_disabled,   type: :boolean, default: false
-    field :forums_disabled,     type: :boolean, default: false
-    field :blips_disabled,      type: :boolean, default: false
-    field :aiburs_disabled,     type: :boolean, default: false
-    field :favorites_disabled,  type: :boolean, default: false
-    field :votes_disabled,      type: :boolean, default: false
-    field :takedowns_disabled,  type: :boolean, default: false
+    field :uploads_disabled,           type: :boolean, default: false
+    field :post_replacements_disabled, type: :boolean, default: false
+    field :pools_disabled,             type: :boolean, default: false
+    field :post_sets_disabled,         type: :boolean, default: false
+    field :comments_disabled,          type: :boolean, default: false
+    field :forums_disabled,            type: :boolean, default: false
+    field :blips_disabled,             type: :boolean, default: false
+    field :aiburs_disabled,            type: :boolean, default: false
+    field :favorites_disabled,         type: :boolean, default: false
+    field :votes_disabled,             type: :boolean, default: false
+    field :takedowns_disabled,         type: :boolean, default: false
   end
 
   scope :limits do
-    field :uploads_min_level,       type: :integer, default: User::Levels::MEMBER, validates: { presence: true, numericality: { only_integer: true, greater_than_or_equal_to: 0 } }
+    field :uploads_min_level,       type: :integer, default: UserLevel::MEMBER, validates: { presence: true, numericality: { only_integer: true, greater_than_or_equal_to: 0 } }
     field :hide_pending_posts_for,  type: :integer, default: 0, validates: { presence: true, numericality: { only_integer: true, greater_than_or_equal_to: 0 } }
   end
 
@@ -39,5 +40,10 @@ class Setting < RailsSettings::Base
     field :trends_ip_window, type: :integer, default: 3600, validates: { presence: true, numericality: { only_integer: true, greater_than: 0 } }
     field :trends_tag_limit, type: :integer, default: 100, validates: { presence: true, numericality: { only_integer: true, greater_than: 0 } }
     field :trends_tag_window, type: :integer, default: 600, validates: { presence: true, numericality: { only_integer: true, greater_than: 0 } }
+  end
+
+  scope :ai_flag do
+    field :automatic_ai_check, type: :boolean, default: true
+    field :ai_flag_reason, type: :string, default: "uploading_guidelines"
   end
 end

@@ -10,11 +10,12 @@ class UserEmailChange
   end
 
   def process
-    if user.is_blocked?
+    if user.is_restricted?
       raise ::User::PrivilegeError.new("Cannot change email while banned")
     end
 
-    if RateLimiter.check_limit("email:#{user.id}", 2, 24.hours)
+    limiter = RateLimiter.new("email:#{user.id}", limit: 2, period: 24.hours)
+    if limiter.throttled?
       user.errors.add(:base, "Email changed too recently")
       return
     end
@@ -28,7 +29,7 @@ class UserEmailChange
       user.save
 
       if user.errors.empty?
-        RateLimiter.hit("email:#{user.id}", 24.hours)
+        limiter.hit!
         if Danbooru.config.enable_email_verification?
           Maintenance::User::EmailConfirmationMailer.confirmation(user).deliver_now
         end

@@ -7,6 +7,7 @@ RSpec.describe PostFlagsController do
 
   # Members older than 3 days bypass the :REJ_NEWBIE throttle gate on post_flag creation.
   let(:member)      { create(:user, created_at: 4.days.ago) }
+  let(:staff)       { create(:staff_user) }
   let(:janitor)     { create(:janitor_user) }
   let(:admin)       { create(:admin_user) }
   let(:post_record) { create(:post) }
@@ -67,6 +68,17 @@ RSpec.describe PostFlagsController do
     it "accepts the ip_addr search param as an admin without error" do
       sign_in_as admin
       get post_flags_path(search: { ip_addr: "127.0.0.1" })
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "redirects anonymous users to login if post_tag_match is used" do
+      get post_flags_path(search: { post_tags_match: "tag" })
+      expect(response).to redirect_to(new_session_path(url: post_flags_path(search: { post_tags_match: "tag" })))
+    end
+
+    it "accepts the post_tags_match search param as a member without error" do
+      sign_in_as member
+      get post_flags_path(search: { post_tags_match: "tag" })
       expect(response).to have_http_status(:ok)
     end
   end
@@ -175,6 +187,12 @@ RSpec.describe PostFlagsController do
       expect(response).to have_http_status(:forbidden)
     end
 
+    it "returns 403 for a staff member" do
+      sign_in_as staff
+      delete "/posts/#{post_record.id}/flag"
+      expect(response).to have_http_status(:forbidden)
+    end
+
     it "unflags the post for a janitor" do
       sign_in_as janitor
       expect { delete "/posts/#{post_record.id}/flag" }.to change { post_record.reload.is_flagged }.from(true).to(false)
@@ -187,6 +205,25 @@ RSpec.describe PostFlagsController do
         sign_in_as janitor
         delete "/posts/#{post_record.id}/flag", params: { approval: "approve" }
         expect(post_record.reload.is_pending).to be false
+      end
+    end
+
+    context "when a post is not flagged" do
+      let(:pending_not_flagged) { create(:pending_post) }
+
+      it "flashes a notice" do
+        sign_in_as janitor
+        delete "/posts/#{pending_not_flagged.id}/flag"
+        expect(response).to redirect_to(post_path(pending_not_flagged))
+        expect(flash[:notice]).to match(/is already unflagged/)
+      end
+
+      it "also approves with approval=approve" do
+        sign_in_as janitor
+        delete "/posts/#{pending_not_flagged.id}/flag", params: { approval: "approve" }
+        expect(flash[:notice]).to match(/is already unflagged/)
+        expect(response).to redirect_to(post_path(pending_not_flagged))
+        expect(pending_not_flagged.reload.is_pending).to be false
       end
     end
   end
@@ -203,6 +240,12 @@ RSpec.describe PostFlagsController do
 
     it "returns 403 for a regular member" do
       sign_in_as member
+      post clear_note_post_flag_path(post_flag)
+      expect(response).to have_http_status(:forbidden)
+    end
+
+    it "returns 403 for a staff member" do
+      sign_in_as staff
       post clear_note_post_flag_path(post_flag)
       expect(response).to have_http_status(:forbidden)
     end
